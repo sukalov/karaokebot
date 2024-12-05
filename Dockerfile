@@ -1,27 +1,32 @@
-# Dockerfile
+# Use an official Python runtime as a parent image
 FROM python:3.11-slim
 
 # Set the working directory in the container
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Install build dependencies needed for compiling packages like TgCrypto
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
-    libc-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the current directory contents into the container at /usr/src/app
-COPY . .
+# Copy the current directory contents into the container at /app
+COPY . /app
 
-# Upgrade pip and install dependencies
+# Create a virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip and install requirements
 RUN pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt .
+RUN pip install -r requirements.txt
 
-# Make port 80 available to the world outside this container
-EXPOSE 80
+# Create a non-root user
+RUN adduser --disabled-password --gecos '' botuser
+USER botuser
 
-# Define environment variable
-ENV NAME ArchiveBot
+# Optional: Set environment variables (can also be set at runtime)
+ENV PYTHONUNBUFFERED=1
 
-# Run the bot
-CMD ["python", "./archive_bot.py"]
+# Command to run the bot
+CMD ["python", "main.py"]
