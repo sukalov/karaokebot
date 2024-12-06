@@ -119,7 +119,7 @@ def echo_all(message):
         user_states[message.from_user.id]["stage"] = "in_line"
         # Send a confirmation message
         bot.reply_to(
-            message, f"привет, {user_name}! ты выбрал песню "{song_name}""
+            message, f"привет, {user_name}! ты выбрал песню '{song_name}'"
         )
 
 
