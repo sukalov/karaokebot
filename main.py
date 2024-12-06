@@ -15,6 +15,14 @@ bot = telebot.TeleBot(BOT_TOKEN)
 df = pd.read_csv("songbook.csv")
 user_states = {}
 
+def convert_datetimes(obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            elif isinstance(obj, dict):
+                return {k: convert_datetimes(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_datetimes(item) for item in obj]
+            return obj
 
 def create_user_info_json(message, user_state=None):
     """
@@ -45,19 +53,24 @@ def create_user_info_json(message, user_state=None):
 # Handler for /me command
 @bot.message_handler(commands=["me"])
 def show_user_info(message):
-    # Check if user has an active state
-    user_id = message.from_user.id
-    user_state = user_states.get(user_id)
-    # Create user info JSON
-    user_info = create_user_info_json(message, user_state)
-    # Convert to formatted JSON string
-    user_info_str = json.dumps(user_info, ensure_ascii=False, indent=4)
-    # Send user info as a message
-    bot.reply_to(
-        message,
-        f"Your current user information:\n```json\n{user_info_str}\n```",
-        parse_mode="Markdown",
-    )
+    try:
+        # Check if user has an active state
+        user_id = message.from_user.id
+        user_state = user_states.get(user_id)
+        # Create user info JSON
+        user_info = create_user_info_json(message, user_state)
+        # Apply the datetime conversion to the user_info dictionary
+        user_info_copy = convert_datetimes(user_info)
+        user_info_str = json.dumps(user_info_copy, ensure_ascii=False, indent=4)
+        # Send user info as a message
+        bot.reply_to(
+            message,
+            f"Your current user information:\n```json\n{user_info_str}\n```",
+            parse_mode="Markdown",
+        )
+    except Exception as e:
+            # Handle any potential errors
+            bot.reply_to(message, f"Произошла ошибка: {str(e)}")
 
 
 # Main message handler
@@ -103,10 +116,10 @@ def echo_all(message):
         # Update user state with name
         user_states[message.from_user.id]["user_name"] = user_name
         user_states[message.from_user.id]["time_added"] = datetime.now()
-        user_states[message.from_user.id]["stage"] = "name_provided"
+        user_states[message.from_user.id]["stage"] = "in_line"
         # Send a confirmation message
         bot.reply_to(
-            message, f"Привет, {user_name}! Ты выбрал песню {song_name} с ID {song_id}"
+            message, f"привет, {user_name}! ты выбрал песню "{song_name}""
         )
 
 
