@@ -13,8 +13,8 @@ source .venv/bin/activate
 # install dependencies
 pip install -r requirements.txt
 
-# create.env
+# create .env
 BOT_TOKEN=your_telegram_bot_token
 
 # run
-python3 main.py
+nodemon --exec python3 main.py
