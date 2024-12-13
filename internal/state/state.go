@@ -89,7 +89,7 @@ func (sm *StateManager) Clear(ctx context.Context) error {
 	defer sm.mu.RUnlock()
 	sm.list = []users.UserState{}
 	if err := sm.db.SetList(ctx, sm.list); err != nil {
-		fmt.Printf("Error happened while clearing the redis list: %s", err)
+		fmt.Printf("error happened while clearing the redis list: %s", err)
 	}
 	return nil
 }

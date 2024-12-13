@@ -73,7 +73,7 @@ func getSongbook(db *sql.DB) {
 		var song Song
 
 		if err := rows.Scan(&song.ID, &song.Category, &song.Title, &song.Artist, &song.ArtistName, &song.Link, &song.AdditionalChords); err != nil {
-			fmt.Println("Error scanning row:", err)
+			fmt.Println("error scanning row:", err)
 			return
 		}
 

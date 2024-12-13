@@ -49,13 +49,13 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		h.userManager.AddUser(ctx, userState)
 		return b.SendMessageWithMarkdown(
 			message.Chat.ID,
-			fmt.Sprintf("привет! выбрана песня \"%s\". *как тебя зовут?* (или того, кто будет петь)", userState.SongName),
+			fmt.Sprintf("привет! *как тебя зовут?* \n\n (чтобы записаться и спеть песню \"%s\" осталось только написать имя певца/певцов)", userState.SongName),
 			false,
 		)
 	}
 	return b.SendMessage(
 		message.Chat.ID,
-		"не, просто так не работает. выбор песен в сонгбуке: https://karaoke-songbook.netlify.app",
+		"не, просто так не работает. выбор песен в сонгбуке: https://karaoke.sukalov.dev",
 	)
 }
 
@@ -104,14 +104,14 @@ func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error 
 	jsonData, err := json.MarshalIndent(userStates, "", "  ")
 	if err != nil {
 		// If JSON marshaling fails, send an error message
-		return b.SendMessage(update.Message.Chat.ID, "Failed to convert user states to JSON")
+		return b.SendMessage(update.Message.Chat.ID, "failed to convert user states to JSON")
 	}
 
 	// Convert JSON bytes to string for sending
 	jsonMessage := string(jsonData)
 
 	// Send the JSON message to the Telegram bot
-	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "User States:\n```json\n"+jsonMessage+"\n```", false)
+	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "```json\n"+jsonMessage+"\n```", false)
 }
 
 func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
