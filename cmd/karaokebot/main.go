@@ -1,13 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"sync"
 
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/admin"
 	"github.com/sukalov/karaokebot/internal/bot/client"
-	"github.com/sukalov/karaokebot/internal/users"
+	"github.com/sukalov/karaokebot/internal/redis"
+	"github.com/sukalov/karaokebot/internal/state"
 	"github.com/sukalov/karaokebot/internal/utils"
 )
 
@@ -40,7 +42,10 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	userManager := users.NewUserStateManager()
+	redisClient := redis.NewDBManager()
+	userManager := state.NewStateManager(redisClient)
+	ctx := context.Background()
+	userManager.Init(ctx)
 	adminUsernames := []string{"sukalov", "admin2"}
 	tokens := mustTokens()
 

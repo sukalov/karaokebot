@@ -1,18 +1,20 @@
 package admin
 
 import (
+	"context"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/common"
-	"github.com/sukalov/karaokebot/internal/users"
+	"github.com/sukalov/karaokebot/internal/state"
 )
 
 type AdminHandlers struct {
-	userManager *users.UserStateManager
+	userManager *state.StateManager
 	admins      map[string]bool
 }
 
-func NewAdminHandlers(userManager *users.UserStateManager, adminUsernames []string) *AdminHandlers {
+func NewAdminHandlers(userManager *state.StateManager, adminUsernames []string) *AdminHandlers {
 	admins := make(map[string]bool)
 	for _, username := range adminUsernames {
 		admins[username] = true
@@ -30,12 +32,12 @@ func (h *AdminHandlers) clearLineHandler(b *bot.Bot, update tgbotapi.Update) err
 	if !h.admins[message.From.UserName] {
 		return b.SendMessage(message.Chat.ID, "вы не админ")
 	}
-
-	h.userManager.Clear()
+	ctx := context.Background()
+	h.userManager.Clear(ctx)
 	return b.SendMessage(message.Chat.ID, "список очищен")
 }
 
-func SetupHandlers(adminBot *bot.Bot, userManager *users.UserStateManager, adminUsernames []string) {
+func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUsernames []string) {
 	handlers := NewAdminHandlers(userManager, adminUsernames)
 
 	commandHandlers := common.GetCommandHandlers(userManager)

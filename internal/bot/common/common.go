@@ -5,14 +5,14 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
-	"github.com/sukalov/karaokebot/internal/users"
+	"github.com/sukalov/karaokebot/internal/state"
 )
 
 type CommonHandlers struct {
-	userManager *users.UserStateManager
+	userManager *state.StateManager
 }
 
-func GetCommandHandlers(userManager *users.UserStateManager) map[string]func(b *bot.Bot, update tgbotapi.Update) error {
+func GetCommandHandlers(userManager *state.StateManager) map[string]func(b *bot.Bot, update tgbotapi.Update) error {
 	handlers := newCommonHandlers(userManager)
 	return map[string]func(b *bot.Bot, update tgbotapi.Update) error{
 		"line": handlers.lineHandler,
@@ -36,7 +36,7 @@ func GetCallbackHandlers() map[string]func(b *bot.Bot, update tgbotapi.Update) e
 	}
 }
 
-func newCommonHandlers(userManager *users.UserStateManager) *CommonHandlers {
+func newCommonHandlers(userManager *state.StateManager) *CommonHandlers {
 	return &CommonHandlers{
 		userManager: userManager,
 	}

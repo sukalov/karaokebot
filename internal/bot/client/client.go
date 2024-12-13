@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -10,14 +11,15 @@ import (
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/common"
 	"github.com/sukalov/karaokebot/internal/songbook"
+	"github.com/sukalov/karaokebot/internal/state"
 	"github.com/sukalov/karaokebot/internal/users"
 )
 
 type ClientHandlers struct {
-	userManager *users.UserStateManager
+	userManager *state.StateManager
 }
 
-func NewClientHandlers(userManager *users.UserStateManager) *ClientHandlers {
+func NewClientHandlers(userManager *state.StateManager) *ClientHandlers {
 	return &ClientHandlers{
 		userManager: userManager,
 	}
@@ -43,7 +45,8 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			ChatID:   message.Chat.ID,
 			Stage:    users.StageAskingName,
 		}
-		h.userManager.Add(userState)
+		ctx := context.Background()
+		h.userManager.AddUser(ctx, userState)
 		return b.SendMessageWithMarkdown(
 			message.Chat.ID,
 			fmt.Sprintf("привет! выбрана песня \"%s\". *как тебя зовут?* (или того, кто будет петь)", userState.SongName),
@@ -57,14 +60,13 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 
 func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	message := update.Message
-	userID := message.From.ID
 	typedName := message.Text
 
-	// Find the state with 'asking_name' stage for this user
-	userStates := h.userManager.GetByUserID(userID)
+	userStates := h.userManager.GetAll()
+
 	var stateToUpdate *users.UserState
 	for i, state := range userStates {
-		if state.Stage == users.StageAskingName {
+		if state.Stage == users.StageAskingName && state.Username == message.From.UserName {
 			stateToUpdate = &userStates[i]
 			break
 		}
@@ -81,7 +83,9 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	stateToUpdate.TimeAdded = time.Now()
 
 	// Edit the state in the user manager
-	h.userManager.Edit(stateToUpdate.ID, *stateToUpdate)
+	ctx := context.Background()
+	h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate)
+	h.userManager.Sync(ctx)
 
 	return b.SendMessageWithMarkdown(
 		message.Chat.ID,
@@ -90,20 +94,6 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	)
 }
 
-func (h *ClientHandlers) exitHandler(b *bot.Bot, update tgbotapi.Update) error {
-	message := update.Message
-	userID := message.From.ID
-	state, exists := h.userManager.Get(userID)
-	if !exists || state.Stage != users.StageInLine {
-		return b.SendMessage(message.Chat.ID, "вас и так нет в очереди..")
-	}
-	// Remove user from queue
-	h.userManager.Delete(userID)
-	return b.SendMessage(
-		message.Chat.ID,
-		"ок, вычёркиваем",
-	)
-}
 func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 	// Convert the map of states to a slice for JSON marshaling
@@ -119,10 +109,10 @@ func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error 
 	jsonMessage := string(jsonData)
 
 	// Send the JSON message to the Telegram bot
-	return b.SendMessage(update.Message.Chat.ID, "User States:\n```json\n"+jsonMessage+"\n```")
+	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "User States:\n```json\n"+jsonMessage+"\n```")
 }
 
-func SetupHandlers(clientBot *bot.Bot, userManager *users.UserStateManager) {
+func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 	handlers := NewClientHandlers(userManager)
 	messageHandlers := []func(b *bot.Bot, update tgbotapi.Update) error{
 		func(b *bot.Bot, update tgbotapi.Update) error {
@@ -130,9 +120,9 @@ func SetupHandlers(clientBot *bot.Bot, userManager *users.UserStateManager) {
 				return nil
 			}
 			// Handle name input for song selection
-			userStates := userManager.GetByUserID(update.Message.From.ID)
+			userStates := userManager.GetAll()
 			for _, state := range userStates {
-				if state.Stage == users.StageAskingName {
+				if state.Stage == users.StageAskingName && state.Username == update.Message.From.UserName {
 					return handlers.nameHandler(b, update)
 				}
 			}
@@ -143,7 +133,6 @@ func SetupHandlers(clientBot *bot.Bot, userManager *users.UserStateManager) {
 	// Pass userManager to GetCommandHandlers
 	commandHandlers := common.GetCommandHandlers(userManager)
 	commandHandlers["start"] = handlers.startHandler
-	commandHandlers["exit"] = handlers.exitHandler
 	commandHandlers["users"] = handlers.usersHandler
 
 	callbackHandlers := common.GetCallbackHandlers()
