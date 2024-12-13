@@ -36,11 +36,13 @@ func (sm *StateManager) Init(ctx context.Context) error {
 
 	// Retrieve song counts for each user
 	for _, state := range list {
-		counts, err := sm.db.GetSongCounts(ctx, state.Username)
-		if err != nil {
-			continue // skip if error retrieving counts
+		if sm.songCounts[state.Username] == nil {
+			counts, err := sm.db.GetSongCounts(ctx, state.Username)
+			if err != nil {
+				continue // skip if error retrieving counts
+			}
+			sm.songCounts[state.Username] = counts
 		}
-		sm.songCounts[state.Username] = counts
 	}
 	return nil
 }
