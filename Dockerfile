@@ -1,32 +1,32 @@
-# Use an official Python runtime as a parent image
-FROM python:3.11-slim
+FROM golang:1.23.4-alpine3.19 AS builder
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Copy and download dependencies
+COPY go.mod go.sum ./
+RUN go mod download
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+# Copy the entire project
+COPY . .
 
-# Create a virtual environment
-RUN python -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
+# Build the application from the specific path
+RUN CGO_ENABLED=0 GOOS=linux go build -o karaokebot ./cmd/karaokebot
 
-# Upgrade pip and install requirements
-RUN pip install --upgrade pip
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# Final stage
+FROM alpine:3.19
 
-# Create a non-root user
-RUN adduser --disabled-password --gecos '' botuser
-USER botuser
+WORKDIR /root/
 
-# Optional: Set environment variables (can also be set at runtime)
-ENV PYTHONUNBUFFERED=1
+# Copy the pre-built binary
+COPY --from=builder /app/karaokebot .
 
-# Command to run the bot
-CMD ["python", "main.py"]
+RUN useradd -m appuser
+USER appuser
+
+# Add HEALTHCHECK instruction
+# Assumes the bot creates a pid file or has a way to check its status
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD ps aux | grep -q 'karaokebot' || exit 1
+
+# Run the bot
+CMD ["./karaokebot"]
