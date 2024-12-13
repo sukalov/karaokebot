@@ -1,32 +1,42 @@
 package songbook
 
 import (
+	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
-	"github.com/gocarina/gocsv"
+	"github.com/sukalov/karaokebot/internal/utils"
+	_ "github.com/tursodatabase/libsql-client-go/libsql"
 )
 
 type Song struct {
-	Rubric      string `csv:"rubric"`
-	Artist      string `csv:"artist"`
-	Song        string `csv:"song"`
-	Name        string `csv:"name"`
-	Link        string `csv:"link"`
-	ExtraChords string `csv:"extra_chords"`
-	ID          string `csv:"id"`
+	ID               string
+	Category         string
+	Title            string
+	Link             string
+	Artist           sql.NullString
+	ArtistName       sql.NullString
+	AdditionalChords sql.NullString
 }
 
 var songs []Song
-var songsErr error
 
 func init() {
-	songs, songsErr = readSongsCSV("data/songbook.csv")
-	if songsErr != nil {
-		log.Fatalf("failed to load songs: %v", songsErr)
+	env, err := utils.LoadEnv([]string{"TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to load db env %s.", err)
+		os.Exit(1)
 	}
+	url := fmt.Sprintf("%s?authToken=%s", env["TURSO_DATABASE_URL"], env["TURSO_AUTH_TOKEN"])
+
+	db, err := sql.Open("libsql", url)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to open db %s: %s", url, err)
+		os.Exit(1)
+	}
+	getSongbook(db)
+	defer db.Close()
 }
 
 func FindSongByID(id string) (Song, bool) {
@@ -39,20 +49,38 @@ func FindSongByID(id string) (Song, bool) {
 }
 
 func FormatSongName(s Song) string {
-	return strings.TrimSpace(fmt.Sprintf("%s %s - %s", s.Name, s.Artist, s.Song))
+	artistName := ""
+	if s.ArtistName.Valid {
+		artistName = s.ArtistName.String
+	}
+	artist := "неизвествен"
+	if s.Artist.Valid {
+		artist = s.Artist.String
+	}
+
+	return strings.TrimSpace(fmt.Sprintf("%s %s - %s", artistName, artist, s.Title))
 }
 
-func readSongsCSV(filePath string) ([]Song, error) {
-	file, err := os.Open(filePath)
+func getSongbook(db *sql.DB) {
+	rows, err := db.Query("SELECT * FROM songbook")
 	if err != nil {
-		return nil, err
+		fmt.Fprintf(os.Stderr, "failed to execute query: %v\n", err)
+		os.Exit(1)
 	}
-	defer file.Close()
+	defer rows.Close()
 
-	var songs []Song
-	if err := gocsv.UnmarshalFile(file, &songs); err != nil {
-		return nil, err
+	for rows.Next() {
+		var song Song
+
+		if err := rows.Scan(&song.ID, &song.Category, &song.Title, &song.Artist, &song.ArtistName, &song.Link, &song.AdditionalChords); err != nil {
+			fmt.Println("Error scanning row:", err)
+			return
+		}
+
+		songs = append(songs, song)
 	}
 
-	return songs, nil
+	if err := rows.Err(); err != nil {
+		fmt.Println("error during rows iteration:", err)
+	}
 }
