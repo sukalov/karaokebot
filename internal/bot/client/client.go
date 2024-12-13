@@ -50,6 +50,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		return b.SendMessageWithMarkdown(
 			message.Chat.ID,
 			fmt.Sprintf("привет! выбрана песня \"%s\". *как тебя зовут?* (или того, кто будет петь)", userState.SongName),
+			false,
 		)
 	}
 	return b.SendMessage(
@@ -91,6 +92,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 		message.Chat.ID,
 		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
 			typedName, stateToUpdate.SongName, stateToUpdate.SongLink),
+		false,
 	)
 }
 
@@ -109,7 +111,7 @@ func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error 
 	jsonMessage := string(jsonData)
 
 	// Send the JSON message to the Telegram bot
-	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "User States:\n```json\n"+jsonMessage+"\n```")
+	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "User States:\n```json\n"+jsonMessage+"\n```", false)
 }
 
 func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {

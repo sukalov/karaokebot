@@ -63,5 +63,5 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 		)
 	}
 
-	return b.SendMessageWithMarkdown(message.Chat.ID, lineMessage)
+	return b.SendMessageWithMarkdown(message.Chat.ID, lineMessage, true)
 }

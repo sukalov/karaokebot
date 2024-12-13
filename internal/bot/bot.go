@@ -103,9 +103,10 @@ func (b *Bot) SendMessage(chatID int64, text string) error {
 	return err
 }
 
-func (b *Bot) SendMessageWithMarkdown(chatID int64, text string) error {
+func (b *Bot) SendMessageWithMarkdown(chatID int64, text string, disableLinks bool) error {
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ParseMode = "Markdown"
+	msg.DisableWebPagePreview = disableLinks
 	_, err := b.Client.Send(msg)
 	return err
 }
