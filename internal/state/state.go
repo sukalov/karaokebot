@@ -95,14 +95,17 @@ func (sm *StateManager) Clear(ctx context.Context) error {
 }
 
 func (sm *StateManager) EditState(ctx context.Context, stateID int64, newState users.UserState) error {
-	sm.mu.RLock()
-	defer sm.mu.RUnlock()
-	for _, state := range sm.list {
+	sm.mu.Lock() // Use Lock(), not RLock(), since we're modifying the slice
+	defer sm.mu.Unlock()
+
+	for i, state := range sm.list {
 		if state.ID == stateID {
-			state = newState
+			sm.list[i] = newState // Modify the slice element directly
+			return nil
 		}
 	}
-	return nil
+
+	return fmt.Errorf("state with ID %d not found", stateID)
 }
 
 func (sm *StateManager) Sync(ctx context.Context) {

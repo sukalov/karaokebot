@@ -35,6 +35,21 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		if !found {
 			return b.SendMessage(message.Chat.ID, "извините, песни с таким id нет")
 		}
+		for _, state := range h.userManager.GetAll() {
+			fmt.Println(state)
+			if state.Username == message.From.UserName && state.Stage == users.StageAskingName {
+				state.SongID = songID
+				state.SongName = songbook.FormatSongName(song)
+				state.SongLink = song.Link
+				h.userManager.EditState(context.Background(), state.ID, state)
+
+				return b.SendMessageWithMarkdown(
+					message.Chat.ID,
+					fmt.Sprintf("привет! *как тебя зовут?* \n\n (чтобы записаться и спеть песню \"%s\" осталось только написать имя певца/певцов)", state.SongName),
+					false,
+				)
+			}
+		}
 		// Prepare user state
 		userState := users.UserState{
 			Username: message.From.UserName,
