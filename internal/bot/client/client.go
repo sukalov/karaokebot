@@ -28,6 +28,7 @@ func NewClientHandlers(userManager *state.StateManager) *ClientHandlers {
 func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error {
 	message := update.Message
 	text := message.Text
+	userStates := h.userManager.GetAll()
 	// Extract song ID from /start command
 	if len(text) > 7 && strings.HasPrefix(text, "/start ") {
 		songID := text[7:]
@@ -35,7 +36,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		if !found {
 			return b.SendMessage(message.Chat.ID, "извините, песни с таким id нет")
 		}
-		for _, state := range h.userManager.GetAll() {
+		for _, state := range userStates {
 			fmt.Println(state)
 			if state.Username == message.From.UserName && state.Stage == users.StageAskingName {
 				state.SongID = songID
@@ -52,6 +53,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		}
 		// Prepare user state
 		userState := users.UserState{
+			ID:       len(userStates) + 1,
 			Username: message.From.UserName,
 			TgName:   fmt.Sprintf("%s %s", message.From.FirstName, message.From.LastName),
 			SongID:   songID,

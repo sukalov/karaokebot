@@ -94,7 +94,7 @@ func (sm *StateManager) Clear(ctx context.Context) error {
 	return nil
 }
 
-func (sm *StateManager) EditState(ctx context.Context, stateID int64, newState users.UserState) error {
+func (sm *StateManager) EditState(ctx context.Context, stateID int, newState users.UserState) error {
 	sm.mu.Lock() // Use Lock(), not RLock(), since we're modifying the slice
 	defer sm.mu.Unlock()
 
