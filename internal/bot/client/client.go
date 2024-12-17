@@ -131,6 +131,13 @@ func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error 
 	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "```json\n"+jsonMessage+"\n```", false)
 }
 
+func randomMessageHandler(b *bot.Bot, update tgbotapi.Update) error {
+	return b.SendMessage(
+		update.Message.Chat.ID,
+		"этого я не понимаю...\n\nвыбор песен в сонгбуке: https://karaoke.sukalov.dev",
+	)
+}
+
 func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 	handlers := NewClientHandlers(userManager)
 	messageHandlers := []func(b *bot.Bot, update tgbotapi.Update) error{
@@ -145,7 +152,8 @@ func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 					return handlers.nameHandler(b, update)
 				}
 			}
-			return nil
+
+			return randomMessageHandler(b, update)
 		},
 	}
 
