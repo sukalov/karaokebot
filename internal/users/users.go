@@ -6,8 +6,8 @@ import (
 
 type UserState struct {
 	ID        int       `json:"id"`
-	Username  string    `json:"username"`
 	ChatID    int64     `json:"chat_id"`
+	Username  string    `json:"username"`
 	TgName    string    `json:"tg_name"`
 	SongID    string    `json:"song_id"`
 	SongName  string    `json:"song_name"`

@@ -1,36 +1,17 @@
 package main
 
 import (
-	"context"
 	"log"
 	"sync"
 
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/admin"
 	"github.com/sukalov/karaokebot/internal/bot/client"
-	"github.com/sukalov/karaokebot/internal/redis"
 	"github.com/sukalov/karaokebot/internal/state"
 	"github.com/sukalov/karaokebot/internal/utils"
 )
 
-// var (
-// 	// adminBotToken string
-// 	songs      []songbook.Song
-// 	userStates []UserState
 // 	// admins        = []string{"sukalov", "olakotr", "yatskovanatoly", "motygapishet"}
-// 	userStatesMux sync.RWMutex
-// )
-
-// type UserState struct {
-// 	Username  string    `json:"username"`
-// 	TgName    string    `json:"tg_name"`
-// 	SongID    string    `json:"song_id"`
-// 	SongName  string    `json:"song_name"`
-// 	SongLink  string    `json:"song_link"`
-// 	TypedName string    `json:"typed_name"`
-// 	TimeAdded time.Time `json:"time_added"`
-// 	Stage     string    `json:"stage"`
-// }
 
 type Tokens struct {
 	clientBotToken string
@@ -42,10 +23,8 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
-	redisClient := redis.NewDBManager()
-	userManager := state.NewStateManager(redisClient)
-	ctx := context.Background()
-	userManager.Init(ctx)
+	userManager := state.NewStateManager()
+	userManager.Init()
 	adminUsernames := []string{"sukalov", "admin2"}
 	tokens := mustTokens()
 

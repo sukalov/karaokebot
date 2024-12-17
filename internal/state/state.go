@@ -10,40 +10,26 @@ import (
 )
 
 type StateManager struct {
-	mu         sync.RWMutex
-	list       []users.UserState
-	songCounts map[string]map[string]int
-	db         *redis.DBManager
+	mu   sync.RWMutex
+	list []users.UserState
 }
 
-func NewStateManager(db *redis.DBManager) *StateManager {
+func NewStateManager() *StateManager {
 	return &StateManager{
-		list:       []users.UserState{},
-		songCounts: make(map[string]map[string]int),
-		db:         db,
+		list: []users.UserState{},
 	}
 }
 
-func (sm *StateManager) Init(ctx context.Context) error {
+func (sm *StateManager) Init() error {
+	ctx := context.Background()
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	// Retrieve the list from Redis
-	list, err := sm.db.GetList(ctx)
+	list, err := redis.GetList(ctx)
 	if err != nil {
 		return err
 	}
 	sm.list = list
-
-	// Retrieve song counts for each user
-	for _, state := range list {
-		if sm.songCounts[state.Username] == nil {
-			counts, err := sm.db.GetSongCounts(ctx, state.Username)
-			if err != nil {
-				continue // skip if error retrieving counts
-			}
-			sm.songCounts[state.Username] = counts
-		}
-	}
 	return nil
 }
 
@@ -51,18 +37,10 @@ func (sm *StateManager) AddUser(ctx context.Context, state users.UserState) erro
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 	sm.list = append(sm.list, state)
-	if err := sm.db.SetList(ctx, sm.list); err != nil {
+	if err := redis.SetList(ctx, sm.list); err != nil {
 		fmt.Printf("error happened while adding to redis list: %s", err)
 		return err
 	}
-	if err := sm.db.IncrementSongCount(ctx, state.Username, state.SongID); err != nil {
-		fmt.Printf("error happened while incrementing users song-count: %s", err)
-		return err
-	}
-	if sm.songCounts[state.Username] == nil {
-		sm.songCounts[state.Username] = make(map[string]int)
-	}
-	sm.songCounts[state.Username][state.SongID]++
 	return nil
 }
 
@@ -88,19 +66,19 @@ func (sm *StateManager) Clear(ctx context.Context) error {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	sm.list = []users.UserState{}
-	if err := sm.db.SetList(ctx, sm.list); err != nil {
+	if err := redis.SetList(ctx, sm.list); err != nil {
 		fmt.Printf("error happened while clearing the redis list: %s", err)
 	}
 	return nil
 }
 
 func (sm *StateManager) EditState(ctx context.Context, stateID int, newState users.UserState) error {
-	sm.mu.Lock() // Use Lock(), not RLock(), since we're modifying the slice
+	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
 	for i, state := range sm.list {
 		if state.ID == stateID {
-			sm.list[i] = newState // Modify the slice element directly
+			sm.list[i] = newState
 			return nil
 		}
 	}
@@ -111,7 +89,7 @@ func (sm *StateManager) EditState(ctx context.Context, stateID int, newState use
 func (sm *StateManager) Sync(ctx context.Context) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
-	if err := sm.db.SetList(ctx, sm.list); err != nil {
+	if err := redis.SetList(ctx, sm.list); err != nil {
 		fmt.Printf("Error happened while updating the redis list: %s", err)
 	}
 }

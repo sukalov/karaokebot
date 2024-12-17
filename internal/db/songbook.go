@@ -15,6 +15,8 @@ type Song struct {
 	Artist           sql.NullString
 	ArtistName       sql.NullString
 	AdditionalChords sql.NullString
+	Excluded         int
+	Counter          int
 }
 
 var songs []Song
@@ -56,7 +58,7 @@ func getSongbook(db *sql.DB) {
 	for rows.Next() {
 		var song Song
 
-		if err := rows.Scan(&song.ID, &song.Category, &song.Title, &song.Artist, &song.ArtistName, &song.Link, &song.AdditionalChords); err != nil {
+		if err := rows.Scan(&song.ID, &song.Category, &song.Title, &song.Artist, &song.ArtistName, &song.Link, &song.AdditionalChords, &song.Excluded, &song.Counter); err != nil {
 			fmt.Println("error scanning row: ", err)
 			return
 		}
