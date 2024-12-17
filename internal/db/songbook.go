@@ -1,13 +1,10 @@
-package songbook
+package db
 
 import (
 	"database/sql"
 	"fmt"
 	"os"
 	"strings"
-
-	"github.com/sukalov/karaokebot/internal/utils"
-	_ "github.com/tursodatabase/libsql-client-go/libsql"
 )
 
 type Song struct {
@@ -23,20 +20,7 @@ type Song struct {
 var songs []Song
 
 func init() {
-	env, err := utils.LoadEnv([]string{"TURSO_DATABASE_URL", "TURSO_AUTH_TOKEN"})
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load db env %s.", err)
-		os.Exit(1)
-	}
-	url := fmt.Sprintf("%s?authToken=%s", env["TURSO_DATABASE_URL"], env["TURSO_AUTH_TOKEN"])
-
-	db, err := sql.Open("libsql", url)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to open db %s: %s", url, err)
-		os.Exit(1)
-	}
-	getSongbook(db)
-	defer db.Close()
+	getSongbook(Database)
 }
 
 func FindSongByID(id string) (Song, bool) {
@@ -53,12 +37,12 @@ func FormatSongName(s Song) string {
 	if s.ArtistName.Valid {
 		artistName = s.ArtistName.String
 	}
-	artist := "неизвествен"
+	artist := ""
 	if s.Artist.Valid {
-		artist = s.Artist.String
+		artist = s.Artist.String + " - "
 	}
 
-	return strings.TrimSpace(fmt.Sprintf("%s %s - %s", artistName, artist, s.Title))
+	return strings.TrimSpace(fmt.Sprintf("%s %s%s", artistName, artist, s.Title))
 }
 
 func getSongbook(db *sql.DB) {
@@ -73,7 +57,7 @@ func getSongbook(db *sql.DB) {
 		var song Song
 
 		if err := rows.Scan(&song.ID, &song.Category, &song.Title, &song.Artist, &song.ArtistName, &song.Link, &song.AdditionalChords); err != nil {
-			fmt.Println("error scanning row:", err)
+			fmt.Println("error scanning row: ", err)
 			return
 		}
 

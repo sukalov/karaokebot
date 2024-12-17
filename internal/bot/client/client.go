@@ -10,7 +10,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/common"
-	"github.com/sukalov/karaokebot/internal/songbook"
+	"github.com/sukalov/karaokebot/internal/db"
 	"github.com/sukalov/karaokebot/internal/state"
 	"github.com/sukalov/karaokebot/internal/users"
 )
@@ -32,7 +32,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 	// Extract song ID from /start command
 	if len(text) > 7 && strings.HasPrefix(text, "/start ") {
 		songID := text[7:]
-		song, found := songbook.FindSongByID(songID)
+		song, found := db.FindSongByID(songID)
 		if !found {
 			return b.SendMessage(message.Chat.ID, "извините, песни с таким id нет")
 		}
@@ -40,7 +40,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			fmt.Println(state)
 			if state.Username == message.From.UserName && state.Stage == users.StageAskingName {
 				state.SongID = songID
-				state.SongName = songbook.FormatSongName(song)
+				state.SongName = db.FormatSongName(song)
 				state.SongLink = song.Link
 				h.userManager.EditState(context.Background(), state.ID, state)
 
@@ -57,7 +57,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			Username: message.From.UserName,
 			TgName:   fmt.Sprintf("%s %s", message.From.FirstName, message.From.LastName),
 			SongID:   songID,
-			SongName: songbook.FormatSongName(song),
+			SongName: db.FormatSongName(song),
 			SongLink: song.Link,
 			ChatID:   message.Chat.ID,
 			Stage:    users.StageAskingName,
