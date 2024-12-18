@@ -1,7 +1,16 @@
+# Define variables
+BINARY_NAME=bin/karaokebot
+LDFLAGS=
+
+# Download dependencies
+.PHONY: deps
+deps:
+	go mod download
+
 # Build binary
 .PHONY: build
 build: deps
-	CGO_ENABLED=0 GOOS=linux go build $(LDFLAGS) -o $(BINARY_NAME) .
+	CGO_ENABLED=0 GOOS=linux go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/karaokebot
 
 # Build Docker image
 .PHONY: docker-build
@@ -18,7 +27,15 @@ docker-push:
 dev:
 	air
 
-# Deployment command (example for a remote server)
+# Deployment command
 .PHONY: deploy
-deploy: docker-build docker-push
-	ssh root@142.93.170.197 'docker pull sukalov/karaokebot:latest && docker restart karaokebot'
+deploy: build docker-build docker-push
+	ssh root@142.93.170.197 "\
+		docker pull sukalov/karaokebot:latest; \
+		docker stop karaokebot || true; \
+		docker rm karaokebot || true; \
+		docker run --name karaokebot \
+		--env-file .env -v \
+		$(pwd)/root/.env:/root/.env \
+		-d sukalov/karaokebot:latest \
+	"
