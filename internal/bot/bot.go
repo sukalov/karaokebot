@@ -110,3 +110,17 @@ func (b *Bot) SendMessageWithMarkdown(chatID int64, text string, disableLinks bo
 	_, err := b.Client.Send(msg)
 	return err
 }
+
+// SendMessageWithMarkup sends a message with an inline keyboard
+func (b *Bot) SendMessageWithButtons(
+	chatID int64,
+	text string,
+	keyboard tgbotapi.InlineKeyboardMarkup,
+) error {
+	msg := tgbotapi.NewMessage(chatID, text)
+	msg.ReplyMarkup = keyboard
+	msg.ParseMode = "Markdown"
+
+	_, err := b.Client.Send(msg)
+	return err
+}

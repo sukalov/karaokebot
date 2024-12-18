@@ -11,7 +11,6 @@ import (
 )
 
 type User struct {
-	ID             int64
 	ChatID         int64
 	Username       sql.NullString
 	TgName         sql.NullString
@@ -76,6 +75,54 @@ func RegisterUser(update tgbotapi.Update) error {
 			message.Chat.ID,
 			userName.String,
 		)
+	}
+
+	return nil
+}
+
+// GetUserByChatID retrieves a user by their chat ID
+func GetUserByChatID(chatID int64) (User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var user User
+	query := `SELECT chat_id, username, tg_name, saved_name, added_at, times_performed
+			  FROM users WHERE chat_id = ?`
+
+	var timestampStr string
+	err := Database.QueryRowContext(ctx, query, chatID).Scan(
+		&user.ChatID,
+		&user.Username,
+		&user.TgName,
+		&user.SavedName,
+		&timestampStr,
+		&user.TimesPerformed,
+	)
+	if err != nil {
+		// Handle error
+		return User{}, err
+	}
+
+	// Parse the timestamp string manually
+	user.AddedAt, err = time.Parse("2006-01-02 15:04:05.999999-07:00", timestampStr)
+	if err != nil {
+		// Handle parsing error
+		return User{}, err
+	}
+
+	return user, nil
+}
+
+// UpdateUserSavedName updates the saved name for a user
+func UpdateUserSavedName(chatID int64, savedName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `UPDATE users SET saved_name = ? WHERE chat_id = ?`
+
+	_, err := Database.ExecContext(ctx, query, savedName, chatID)
+	if err != nil {
+		return fmt.Errorf("failed to update saved name: %v", err)
 	}
 
 	return nil

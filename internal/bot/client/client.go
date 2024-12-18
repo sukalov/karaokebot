@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -29,7 +30,14 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 	message := update.Message
 	text := message.Text
 	userStates := h.userManager.GetAll()
-	db.RegisterUser(update)
+
+	// First, register the user in the database
+	err := db.RegisterUser(update)
+	if err != nil {
+		log.Printf("error registering user: %v", err)
+		return b.SendMessage(message.Chat.ID, "произошла ошибка при регистрации")
+	}
+
 	// Extract song ID from /start command
 	if len(text) > 7 && strings.HasPrefix(text, "/start ") {
 		songID := text[7:]
@@ -37,12 +45,40 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		if !found {
 			return b.SendMessage(message.Chat.ID, "извините, песни с таким id нет")
 		}
+
+		// Check if user exists in database
+		user, err := db.GetUserByChatID(message.Chat.ID)
+		if err != nil {
+			log.Printf("Error fetching user: %v", err)
+			return b.SendMessage(message.Chat.ID, "произошла ошибка при поиске пользователя")
+		}
+
+		// Check if user has a saved name
+		var savedNameText string
+		if user.SavedName.Valid {
+			savedNameText = user.SavedName.String
+		}
+
+		// Check existing states for this user
 		for _, state := range userStates {
 			if state.Username == message.From.UserName && state.Stage == users.StageAskingName {
 				state.SongID = songID
 				state.SongName = db.FormatSongName(song)
 				state.SongLink = song.Link
 				h.userManager.EditState(context.Background(), state.ID, state)
+
+				// If user has a saved name, offer to use it
+				if savedNameText != "" {
+					return b.SendMessageWithButtons(
+						message.Chat.ID,
+						fmt.Sprintf("так-так. кто будет песть песню \"%s\"?\n\nнажмите на кнопку или напишите новое имя", state.SongName),
+						tgbotapi.NewInlineKeyboardMarkup(
+							tgbotapi.NewInlineKeyboardRow(
+								tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("записаться как %s", savedNameText), "use_saved_name:"+songID),
+							),
+						),
+					)
+				}
 
 				return b.SendMessageWithMarkdown(
 					message.Chat.ID,
@@ -52,10 +88,12 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			}
 		}
 
+		// If no existing state, create a new one
 		previousStates := h.userManager.GetAllThisUser(message.Chat.ID)
 		if len(previousStates) >= 3 {
 			return b.SendMessage(message.Chat.ID, "больше трёх раз записываться нельзя\n\nУВЫ!")
 		}
+
 		// Prepare user state
 		userState := users.UserState{
 			ID:       len(userStates) + 1,
@@ -69,16 +107,72 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		}
 		ctx := context.Background()
 		h.userManager.AddUser(ctx, userState)
+
+		// If user has a saved name, offer to use it
+		if savedNameText != "" {
+			return b.SendMessageWithButtons(
+				message.Chat.ID,
+				fmt.Sprintf("так-так. кто будет песть песню \"%s\"?\n\nнажмите на кнопку или просто напишите новое имя", userState.SongName),
+				tgbotapi.NewInlineKeyboardMarkup(
+					tgbotapi.NewInlineKeyboardRow(
+						tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("записаться как %s", savedNameText), "use_saved_name"),
+					),
+				),
+			)
+		}
+
 		return b.SendMessageWithMarkdown(
 			message.Chat.ID,
-			fmt.Sprintf("привет! *как тебя зовут?* \n\n (чтобы записаться и спеть песню \"%s\" осталось только написать имя певца/певцов)", userState.SongName),
+			fmt.Sprintf("привет! *как тебя зовут?*\n\n(чтобы записаться и спеть песню \"%s\" осталось только написать имя певца/певцов)", userState.SongName),
 			false,
 		)
 	}
+
 	return b.SendMessage(
 		message.Chat.ID,
 		"не, просто так не работает. выбор песен в сонгбуке: https://karaoke.sukalov.dev",
 	)
+}
+
+func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update) error {
+	query := update.CallbackQuery
+	message := query.Message
+	userStates := h.userManager.GetAllThisUser(message.Chat.ID)
+
+	var stateToUpdate *users.UserState
+	for i, state := range userStates {
+		if state.Stage == users.StageAskingName {
+			stateToUpdate = &userStates[i]
+			break
+		}
+	}
+
+	if stateToUpdate == nil {
+		return b.SendMessage(message.Chat.ID, "жать на ту кнопку уже поздно")
+	}
+
+	// Fetch user to get saved name
+	user, err := db.GetUserByChatID(message.Chat.ID)
+	if err != nil {
+		return b.SendMessage(message.Chat.ID, "произошла ошибка при получении сохраненного имени")
+	}
+
+	if user.SavedName.Valid {
+		stateToUpdate.TypedName = user.SavedName.String
+		stateToUpdate.Stage = users.StageInLine
+		h.userManager.EditState(context.Background(), stateToUpdate.ID, *stateToUpdate)
+		h.userManager.Sync(context.Background())
+
+		// Send confirmation
+		return b.SendMessageWithMarkdown(
+			message.Chat.ID,
+			fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
+				user.SavedName.String, stateToUpdate.SongName, stateToUpdate.SongLink),
+			false,
+		)
+	}
+
+	return nil
 }
 
 func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
@@ -97,7 +191,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 	// If no matching state found, return
 	if stateToUpdate == nil {
-		return nil
+		return fmt.Errorf("no state with asking_name was found")
 	}
 
 	// Update the found state
@@ -125,14 +219,11 @@ func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error 
 
 	jsonData, err := json.MarshalIndent(userStates, "", "  ")
 	if err != nil {
-		// If JSON marshaling fails, send an error message
 		return b.SendMessage(update.Message.Chat.ID, "failed to convert user states to JSON")
 	}
 
 	// Convert JSON bytes to string for sending
 	jsonMessage := string(jsonData)
-
-	// Send the JSON message to the Telegram bot
 	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "```json\n"+jsonMessage+"\n```", false)
 }
 
@@ -168,6 +259,8 @@ func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 	commandHandlers["users"] = handlers.usersHandler
 
 	callbackHandlers := common.GetCallbackHandlers()
+	callbackHandlers["use_saved_name"] = handlers.useSavedNameHandler
+
 	go clientBot.Start(
 		commandHandlers,
 		messageHandlers,

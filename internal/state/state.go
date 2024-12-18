@@ -102,6 +102,6 @@ func (sm *StateManager) Sync(ctx context.Context) {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	if err := redis.SetList(ctx, sm.list); err != nil {
-		fmt.Printf("Error happened while updating the redis list: %s", err)
+		fmt.Printf("error happened while updating the redis list: %s", err)
 	}
 }
