@@ -19,7 +19,15 @@ type User struct {
 	TimesPerformed int
 }
 
-func RegisterUser(update tgbotapi.Update) error {
+type UsersType struct{}
+
+var Users = &UsersType{}
+
+func init() {
+	// If you need to load users initially, you can add a method to do so here
+}
+
+func (u *UsersType) Register(update tgbotapi.Update) error {
 	// Prepare context and ensure database connection
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -80,8 +88,7 @@ func RegisterUser(update tgbotapi.Update) error {
 	return nil
 }
 
-// GetUserByChatID retrieves a user by their chat ID
-func GetUserByChatID(chatID int64) (User, error) {
+func (u *UsersType) GetByChatID(chatID int64) (User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -113,16 +120,30 @@ func GetUserByChatID(chatID int64) (User, error) {
 	return user, nil
 }
 
-// UpdateUserSavedName updates the saved name for a user
-func UpdateUserSavedName(chatID int64, savedName string) error {
+func (u *UsersType) UpdateSavedName(chatID int64, newName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	query := `UPDATE users SET saved_name = ? WHERE chat_id = ?`
 
-	_, err := Database.ExecContext(ctx, query, savedName, chatID)
+	_, err := Database.ExecContext(ctx, query, newName, chatID)
 	if err != nil {
 		return fmt.Errorf("failed to update saved name: %v", err)
+	}
+
+	return nil
+}
+
+// New method to increment times performed for a user
+func (u *UsersType) IncrementTimesPerformed(chatID int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	query := `UPDATE users SET times_performed = times_performed + 1 WHERE chat_id = ?`
+
+	_, err := Database.ExecContext(ctx, query, chatID)
+	if err != nil {
+		return fmt.Errorf("failed to increment times performed: %v", err)
 	}
 
 	return nil

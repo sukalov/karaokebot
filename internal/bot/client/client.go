@@ -31,8 +31,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 	text := message.Text
 	userStates := h.userManager.GetAll()
 
-	// First, register the user in the database
-	err := db.RegisterUser(update)
+	err := db.Users.Register(update)
 	if err != nil {
 		log.Printf("error registering user: %v", err)
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при регистрации")
@@ -47,7 +46,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		}
 
 		// Check if user exists in database
-		user, err := db.GetUserByChatID(message.Chat.ID)
+		user, err := db.Users.GetByChatID(message.Chat.ID)
 		if err != nil {
 			log.Printf("Error fetching user: %v", err)
 			return b.SendMessage(message.Chat.ID, "произошла ошибка при поиске пользователя")
@@ -152,7 +151,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	}
 
 	// Fetch user to get saved name
-	user, err := db.GetUserByChatID(message.Chat.ID)
+	user, err := db.Users.GetByChatID(message.Chat.ID)
 	if err != nil {
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при получении сохраненного имени")
 	}
@@ -164,7 +163,13 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 		h.userManager.EditState(context.Background(), stateToUpdate.ID, *stateToUpdate)
 		h.userManager.Sync(context.Background())
 
-		// Send confirmation
+		if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
+			fmt.Printf("increment performances failed: %s", err)
+		}
+		if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
+			fmt.Printf("increment counter failed: %s", err)
+		}
+
 		return b.SendMessageWithMarkdown(
 			message.Chat.ID,
 			fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
@@ -178,7 +183,6 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 
 func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	message := update.Message
-
 	userStates := h.userManager.GetAllThisUser(update.Message.Chat.ID)
 
 	var stateToUpdate *users.UserState
@@ -203,7 +207,15 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	ctx := context.Background()
 	h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate)
 	h.userManager.Sync(ctx)
-
+	if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
+		fmt.Printf("increment performances failed: %s", err)
+	}
+	if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
+		fmt.Printf("increment counter failed: %s", err)
+	}
+	if err := db.Users.UpdateSavedName(stateToUpdate.ChatID, stateToUpdate.TypedName); err != nil {
+		fmt.Printf("increment counter failed: %s", err)
+	}
 	return b.SendMessageWithMarkdown(
 		message.Chat.ID,
 		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
@@ -214,7 +226,6 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error {
 
-	// Convert the map of states to a slice for JSON marshaling
 	userStates := h.userManager.GetAll()
 
 	jsonData, err := json.MarshalIndent(userStates, "", "  ")
@@ -222,7 +233,6 @@ func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error 
 		return b.SendMessage(update.Message.Chat.ID, "failed to convert user states to JSON")
 	}
 
-	// Convert JSON bytes to string for sending
 	jsonMessage := string(jsonData)
 	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "```json\n"+jsonMessage+"\n```", false)
 }

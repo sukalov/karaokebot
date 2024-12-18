@@ -1,10 +1,12 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 type Song struct {
@@ -73,4 +75,17 @@ func (s *SongbookType) getSongbook(db *sql.DB) {
 	if err := rows.Err(); err != nil {
 		fmt.Println("error during rows iteration:", err)
 	}
+}
+
+func (s *SongbookType) IncrementSongCounter(songID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	query := `UPDATE songbook SET counter = counter + 1 WHERE id = ?`
+
+	_, err := Database.ExecContext(ctx, query, songID)
+	if err != nil {
+		return fmt.Errorf("failed to increment song counter: %v", err)
+	}
+
+	return nil
 }
