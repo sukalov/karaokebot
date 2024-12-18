@@ -48,7 +48,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		// Check if user exists in database
 		user, err := db.Users.GetByChatID(message.Chat.ID)
 		if err != nil {
-			log.Printf("Error fetching user: %v", err)
+			log.Printf("error fetching user: %v", err)
 			return b.SendMessage(message.Chat.ID, "произошла ошибка при поиске пользователя")
 		}
 
