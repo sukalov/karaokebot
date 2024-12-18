@@ -14,6 +14,8 @@ type AdminHandlers struct {
 	admins      map[string]bool
 }
 
+var ClearInProgress = false
+
 func NewAdminHandlers(userManager *state.StateManager, adminUsernames []string) *AdminHandlers {
 	admins := make(map[string]bool)
 	for _, username := range adminUsernames {
@@ -32,9 +34,34 @@ func (h *AdminHandlers) clearLineHandler(b *bot.Bot, update tgbotapi.Update) err
 	if !h.admins[message.From.UserName] {
 		return b.SendMessage(message.Chat.ID, "вы не админ")
 	}
+	ClearInProgress = true
+	return b.SendMessageWithButtons(message.Chat.ID, "весь список будет безвозвратно удалён! уверены?",
+		tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("удаляем", "confirm_clear_line"),
+				tgbotapi.NewInlineKeyboardButtonData("отмена", "abort_clear_line"),
+			),
+		),
+	)
+}
+
+func (h *AdminHandlers) confirmHandler(b *bot.Bot, update tgbotapi.Update) error {
 	ctx := context.Background()
-	h.userManager.Clear(ctx)
-	return b.SendMessage(message.Chat.ID, "список очищен")
+	if ClearInProgress {
+		h.userManager.Clear(ctx)
+		ClearInProgress = false
+		return b.SendMessage(update.CallbackQuery.From.ID, "список очищен")
+	}
+	return b.SendMessage(update.CallbackQuery.From.ID, "кнопка уже не работает")
+
+}
+
+func (h *AdminHandlers) abortHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if ClearInProgress {
+		ClearInProgress = false
+		return b.SendMessage(update.CallbackQuery.From.ID, "ок. отменили")
+	}
+	return b.SendMessage(update.CallbackQuery.From.ID, "кнопка уже не работает")
 }
 
 func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUsernames []string) {
@@ -44,6 +71,8 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["clear_line"] = handlers.clearLineHandler
 
 	callbackHandlers := common.GetCallbackHandlers()
+	callbackHandlers["abort_clear_line"] = handlers.abortHandler
+	callbackHandlers["confirm_clear_line"] = handlers.confirmHandler
 
 	go adminBot.Start(commandHandlers, nil, callbackHandlers)
 }
