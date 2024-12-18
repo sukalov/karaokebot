@@ -41,7 +41,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 	// Extract song ID from /start command
 	if len(text) > 7 && strings.HasPrefix(text, "/start ") {
 		songID := text[7:]
-		song, found := db.FindSongByID(songID)
+		song, found := db.Songbook.FindSongByID(songID)
 		if !found {
 			return b.SendMessage(message.Chat.ID, "извините, песни с таким id нет")
 		}
@@ -63,7 +63,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		for _, state := range userStates {
 			if state.Username == message.From.UserName && state.Stage == users.StageAskingName {
 				state.SongID = songID
-				state.SongName = db.FormatSongName(song)
+				state.SongName = db.Songbook.FormatSongName(song)
 				state.SongLink = song.Link
 				h.userManager.EditState(context.Background(), state.ID, state)
 
@@ -100,7 +100,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			Username: message.From.UserName,
 			TgName:   fmt.Sprintf("%s %s", message.From.FirstName, message.From.LastName),
 			SongID:   songID,
-			SongName: db.FormatSongName(song),
+			SongName: db.Songbook.FormatSongName(song),
 			SongLink: song.Link,
 			ChatID:   message.Chat.ID,
 			Stage:    users.StageAskingName,
@@ -160,6 +160,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	if user.SavedName.Valid {
 		stateToUpdate.TypedName = user.SavedName.String
 		stateToUpdate.Stage = users.StageInLine
+		stateToUpdate.TimeAdded = time.Now()
 		h.userManager.EditState(context.Background(), stateToUpdate.ID, *stateToUpdate)
 		h.userManager.Sync(context.Background())
 
@@ -177,13 +178,12 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 
 func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	message := update.Message
-	typedName := message.Text
 
-	userStates := h.userManager.GetAll()
+	userStates := h.userManager.GetAllThisUser(update.Message.Chat.ID)
 
 	var stateToUpdate *users.UserState
 	for i, state := range userStates {
-		if state.Stage == users.StageAskingName && state.Username == message.From.UserName {
+		if state.Stage == users.StageAskingName {
 			stateToUpdate = &userStates[i]
 			break
 		}
@@ -195,7 +195,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	}
 
 	// Update the found state
-	stateToUpdate.TypedName = typedName
+	stateToUpdate.TypedName = message.Text
 	stateToUpdate.Stage = users.StageInLine
 	stateToUpdate.TimeAdded = time.Now()
 
@@ -207,7 +207,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessageWithMarkdown(
 		message.Chat.ID,
 		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
-			typedName, stateToUpdate.SongName, stateToUpdate.SongLink),
+			message.Text, stateToUpdate.SongName, stateToUpdate.SongLink),
 		false,
 	)
 }

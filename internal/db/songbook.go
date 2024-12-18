@@ -19,14 +19,18 @@ type Song struct {
 	Counter          int
 }
 
-var songs []Song
-
-func init() {
-	getSongbook(Database)
+type SongbookType struct {
+	songs []Song
 }
 
-func FindSongByID(id string) (Song, bool) {
-	for _, song := range songs {
+var Songbook = &SongbookType{}
+
+func init() {
+	Songbook.getSongbook(Database)
+}
+
+func (s *SongbookType) FindSongByID(id string) (Song, bool) {
+	for _, song := range s.songs {
 		if song.ID == id {
 			return song, true
 		}
@@ -34,20 +38,20 @@ func FindSongByID(id string) (Song, bool) {
 	return Song{}, false
 }
 
-func FormatSongName(s Song) string {
+func (s *SongbookType) FormatSongName(song Song) string {
 	artistName := ""
-	if s.ArtistName.Valid {
-		artistName = s.ArtistName.String
+	if song.ArtistName.Valid {
+		artistName = song.ArtistName.String
 	}
 	artist := ""
-	if s.Artist.Valid {
-		artist = s.Artist.String + " - "
+	if song.Artist.Valid {
+		artist = song.Artist.String + " - "
 	}
 
-	return strings.TrimSpace(fmt.Sprintf("%s %s%s", artistName, artist, s.Title))
+	return strings.TrimSpace(fmt.Sprintf("%s %s%s", artistName, artist, song.Title))
 }
 
-func getSongbook(db *sql.DB) {
+func (s *SongbookType) getSongbook(db *sql.DB) {
 	rows, err := db.Query("SELECT * FROM songbook")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to execute query: %v\n", err)
@@ -63,7 +67,7 @@ func getSongbook(db *sql.DB) {
 			return
 		}
 
-		songs = append(songs, song)
+		s.songs = append(s.songs, song)
 	}
 
 	if err := rows.Err(); err != nil {
