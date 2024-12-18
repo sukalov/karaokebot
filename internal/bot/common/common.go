@@ -6,6 +6,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/state"
+	"github.com/sukalov/karaokebot/internal/utils"
 )
 
 type CommonHandlers struct {
@@ -58,7 +59,7 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 			userState.TypedName,
 			userState.SongName,
 			userState.SongLink,
-			userState.TimeAdded.Format("15:04:05"),
+			utils.ConvertToMoscowTime(userState.TimeAdded),
 			userState.Username,
 		)
 	}
