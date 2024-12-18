@@ -25,7 +25,7 @@ func main() {
 
 	userManager := state.NewStateManager()
 	userManager.Init()
-	adminUsernames := []string{"sukalov", "admin2"}
+	adminUsernames := []string{"sukalov", "olakotr", "motygapishet"}
 	tokens := mustTokens()
 
 	adminBot, err := bot.New("AdminBot", tokens.adminBotToken)
