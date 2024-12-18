@@ -27,7 +27,13 @@ func LoadEnv(requiredVars []string) (map[string]string, error) {
 	return envVars, nil
 }
 
-func ConvertToMoscowTime(t time.Time) string {
-	moscowLocation, _ := time.LoadLocation("Europe/Moscow")
-	return t.In(moscowLocation).Format("15:04:05")
+func ConvertToMoscowTime(t time.Time) (string, error) {
+	moscowLocation, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		panic(err)
+	}
+	if t.Location() == time.UTC || t.Location() == nil {
+		t = t.In(time.UTC)
+	}
+	return t.In(moscowLocation).Format("15:04:05"), nil
 }
