@@ -50,6 +50,18 @@ func (sm *StateManager) GetAll() []users.UserState {
 	return sm.list
 }
 
+func (sm *StateManager) GetAllThisUser(chatID int64) []users.UserState {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	var thisUserStates []users.UserState
+	for _, state := range sm.list {
+		if state.ChatID == chatID {
+			thisUserStates = append(thisUserStates, state)
+		}
+	}
+	return thisUserStates
+}
+
 func (sm *StateManager) GetAllInLine() []users.UserState {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()

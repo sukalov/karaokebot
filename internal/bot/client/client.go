@@ -51,6 +51,11 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 				)
 			}
 		}
+
+		previousStates := h.userManager.GetAllThisUser(message.Chat.ID)
+		if len(previousStates) >= 3 {
+			return b.SendMessage(message.Chat.ID, "больше трёх раз записываться нельзя\n\nУВЫ!")
+		}
 		// Prepare user state
 		userState := users.UserState{
 			ID:       len(userStates) + 1,
