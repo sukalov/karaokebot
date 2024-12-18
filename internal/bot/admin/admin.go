@@ -10,21 +10,23 @@ import (
 )
 
 type AdminHandlers struct {
-	userManager *state.StateManager
-	admins      map[string]bool
+	userManager     *state.StateManager
+	admins          map[string]bool
+	clearInProgress map[string]bool
 }
-
-var ClearInProgress = false
 
 func NewAdminHandlers(userManager *state.StateManager, adminUsernames []string) *AdminHandlers {
 	admins := make(map[string]bool)
+	clearInProgress := make(map[string]bool)
 	for _, username := range adminUsernames {
 		admins[username] = true
+		clearInProgress[username] = false
 	}
 
 	return &AdminHandlers{
-		userManager: userManager,
-		admins:      admins,
+		userManager:     userManager,
+		admins:          admins,
+		clearInProgress: clearInProgress,
 	}
 }
 
@@ -34,7 +36,7 @@ func (h *AdminHandlers) clearLineHandler(b *bot.Bot, update tgbotapi.Update) err
 	if !h.admins[message.From.UserName] {
 		return b.SendMessage(message.Chat.ID, "вы не админ")
 	}
-	ClearInProgress = true
+	h.clearInProgress[update.Message.From.UserName] = true
 	return b.SendMessageWithButtons(message.Chat.ID, "весь список будет безвозвратно удалён! уверены?",
 		tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
@@ -47,9 +49,9 @@ func (h *AdminHandlers) clearLineHandler(b *bot.Bot, update tgbotapi.Update) err
 
 func (h *AdminHandlers) confirmHandler(b *bot.Bot, update tgbotapi.Update) error {
 	ctx := context.Background()
-	if ClearInProgress {
+	if h.clearInProgress[update.CallbackQuery.From.UserName] {
 		h.userManager.Clear(ctx)
-		ClearInProgress = false
+		h.clearInProgress[update.CallbackQuery.From.UserName] = false
 		return b.SendMessage(update.CallbackQuery.From.ID, "список очищен")
 	}
 	return b.SendMessage(update.CallbackQuery.From.ID, "кнопка уже не работает")
@@ -57,8 +59,8 @@ func (h *AdminHandlers) confirmHandler(b *bot.Bot, update tgbotapi.Update) error
 }
 
 func (h *AdminHandlers) abortHandler(b *bot.Bot, update tgbotapi.Update) error {
-	if ClearInProgress {
-		ClearInProgress = false
+	if h.clearInProgress[update.CallbackQuery.From.UserName] {
+		h.clearInProgress[update.CallbackQuery.From.UserName] = false
 		return b.SendMessage(update.CallbackQuery.From.ID, "ок. отменили")
 	}
 	return b.SendMessage(update.CallbackQuery.From.ID, "кнопка уже не работает")
