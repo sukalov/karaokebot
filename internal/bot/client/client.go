@@ -29,6 +29,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 	message := update.Message
 	text := message.Text
 	userStates := h.userManager.GetAll()
+	ctx := context.Background()
 
 	err := db.Users.Register(update)
 	if err != nil {
@@ -63,7 +64,8 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 				state.SongID = songID
 				state.SongName = db.Songbook.FormatSongName(song)
 				state.SongLink = song.Link
-				h.userManager.EditState(context.Background(), state.ID, state)
+				h.userManager.EditState(ctx, state.ID, state)
+				h.userManager.Sync(ctx)
 
 				// If user has a saved name, offer to use it
 				if savedNameText != "" {
@@ -103,8 +105,8 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			ChatID:   message.Chat.ID,
 			Stage:    users.StageAskingName,
 		}
-		ctx := context.Background()
 		h.userManager.AddUser(ctx, userState)
+		h.userManager.Sync(ctx)
 
 		// If user has a saved name, offer to use it
 		if savedNameText != "" {
@@ -155,29 +157,30 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при получении сохраненного имени")
 	}
 
-	if user.SavedName.Valid {
-		stateToUpdate.TypedName = user.SavedName.String
-		stateToUpdate.Stage = users.StageInLine
-		stateToUpdate.TimeAdded = time.Now()
-		h.userManager.EditState(context.Background(), stateToUpdate.ID, *stateToUpdate)
-		h.userManager.Sync(context.Background())
-
-		if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
-			fmt.Printf("increment performances failed: %s", err)
-		}
-		if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
-			fmt.Printf("increment counter failed: %s", err)
-		}
-
-		return b.SendMessageWithMarkdown(
-			message.Chat.ID,
-			fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
-				user.SavedName.String, stateToUpdate.SongName, stateToUpdate.SongLink),
-			false,
-		)
+	if !user.SavedName.Valid {
+		fmt.Printf("user saved name not found")
+		return fmt.Errorf("user saved name not found")
 	}
 
-	return nil
+	stateToUpdate.TypedName = user.SavedName.String
+	stateToUpdate.Stage = users.StageInLine
+	stateToUpdate.TimeAdded = time.Now()
+	h.userManager.EditState(context.Background(), stateToUpdate.ID, *stateToUpdate)
+	h.userManager.Sync(context.Background())
+
+	if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
+		fmt.Printf("increment performances failed: %s", err)
+	}
+	if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
+		fmt.Printf("increment counter failed: %s", err)
+	}
+
+	return b.SendMessageWithMarkdown(
+		message.Chat.ID,
+		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
+			user.SavedName.String, stateToUpdate.SongName, stateToUpdate.SongLink),
+		false,
+	)
 }
 
 func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
