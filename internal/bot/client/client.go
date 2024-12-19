@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -60,7 +59,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 
 		// Check existing states for this user
 		for _, state := range userStates {
-			if state.Username == message.From.UserName && state.Stage == users.StageAskingName {
+			if state.ChatID == message.Chat.ID && state.Stage == users.StageAskingName {
 				state.SongID = songID
 				state.SongName = db.Songbook.FormatSongName(song)
 				state.SongLink = song.Link
@@ -224,19 +223,6 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	)
 }
 
-func (h *ClientHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error {
-
-	userStates := h.userManager.GetAll()
-
-	jsonData, err := json.MarshalIndent(userStates, "", "  ")
-	if err != nil {
-		return b.SendMessage(update.Message.Chat.ID, "failed to convert user states to JSON")
-	}
-
-	jsonMessage := string(jsonData)
-	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "```json\n"+jsonMessage+"\n```", false)
-}
-
 func randomMessageHandler(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessage(
 		update.Message.Chat.ID,
@@ -266,7 +252,6 @@ func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 	// Pass userManager to GetCommandHandlers
 	commandHandlers := common.GetCommandHandlers(userManager)
 	commandHandlers["start"] = handlers.startHandler
-	commandHandlers["users"] = handlers.usersHandler
 
 	callbackHandlers := common.GetCallbackHandlers()
 	callbackHandlers["use_saved_name"] = handlers.useSavedNameHandler

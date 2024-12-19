@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -16,7 +17,8 @@ type CommonHandlers struct {
 func GetCommandHandlers(userManager *state.StateManager) map[string]func(b *bot.Bot, update tgbotapi.Update) error {
 	handlers := newCommonHandlers(userManager)
 	return map[string]func(b *bot.Bot, update tgbotapi.Update) error{
-		"line": handlers.lineHandler,
+		"line":  handlers.lineHandler,
+		"users": handlers.usersHandler,
 	}
 }
 
@@ -65,4 +67,17 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 	}
 
 	return b.SendMessageWithMarkdown(message.Chat.ID, lineMessage, true)
+}
+
+func (h *CommonHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error {
+
+	userStates := h.userManager.GetAll()
+
+	jsonData, err := json.MarshalIndent(userStates, "", "  ")
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, "failed to convert user states to JSON")
+	}
+
+	jsonMessage := string(jsonData)
+	return b.SendMessageWithMarkdown(update.Message.Chat.ID, "```json\n"+jsonMessage+"\n```", false)
 }

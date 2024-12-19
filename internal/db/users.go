@@ -26,7 +26,14 @@ var Users = &UsersType{}
 
 func (u *UsersType) Register(update tgbotapi.Update) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	defer func() {
+		cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("error: timeout in 'Register' canceled after 5 seconds: %v",
+				ctx.Err(),
+			)
+		}
+	}()
 
 	message := update.Message
 	userName := sql.NullString{
@@ -99,11 +106,19 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 
 func (u *UsersType) GetByChatID(chatID int64) (User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var user User
 	query := `SELECT chat_id, username, tg_name, saved_name, added_at, times_performed
 			  FROM users WHERE chat_id = ?`
+	defer func() {
+		cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("error: timeout in query '%s' canceled after 5 seconds: %v",
+				query,
+				ctx.Err(),
+			)
+		}
+	}()
+
+	var user User
 
 	var timestampStr string
 	err := Database.QueryRowContext(ctx, query, chatID).Scan(
@@ -126,9 +141,16 @@ func (u *UsersType) GetByChatID(chatID int64) (User, error) {
 
 func (u *UsersType) UpdateSavedName(chatID int64, newName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	query := `UPDATE users SET saved_name = ? WHERE chat_id = ?`
+	defer func() {
+		cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("error: timeout in query '%s' canceled after 5 seconds: %v",
+				query,
+				ctx.Err(),
+			)
+		}
+	}()
 
 	result, err := Database.ExecContext(ctx, query, newName, chatID)
 	if err != nil {

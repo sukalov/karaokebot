@@ -87,9 +87,17 @@ func (s *SongbookType) FormatSongName(song Song) string {
 
 func (s *SongbookType) IncrementSongCounter(songID string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	query := `UPDATE songbook SET counter = counter + 1 WHERE id = ?`
+	defer func() {
+		cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("error: timeout in query '%s' canceled after 5 seconds: %v",
+				query,
+				ctx.Err(),
+			)
+		}
+	}()
+
 	result, err := Database.ExecContext(ctx, query, songID)
 	if err != nil {
 		return fmt.Errorf("failed to increment song counter: %w", err)
