@@ -75,7 +75,7 @@ func (s *SongbookType) FindSongByID(id string) (Song, bool) {
 func (s *SongbookType) FormatSongName(song Song) string {
 	var parts []string
 	if song.ArtistName.Valid {
-		parts = append(parts, song.ArtistName.String)
+		parts = append(parts, fmt.Sprint(song.ArtistName.String, " "))
 	}
 	if song.Artist.Valid {
 		parts = append(parts, song.Artist.String+" - ")
