@@ -98,10 +98,12 @@ func (sm *StateManager) EditState(ctx context.Context, stateID int, newState use
 	return fmt.Errorf("state with ID %d not found", stateID)
 }
 
-func (sm *StateManager) Sync(ctx context.Context) {
+func (sm *StateManager) Sync(ctx context.Context) error {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	if err := redis.SetList(ctx, sm.list); err != nil {
 		fmt.Printf("error happened while updating the redis list: %s", err)
+		return err
 	}
+	return nil
 }

@@ -74,7 +74,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 						fmt.Sprintf("так-так. кто будет песть песню \"%s\"?\n\nнажмите на кнопку или напишите новое имя", state.SongName),
 						tgbotapi.NewInlineKeyboardMarkup(
 							tgbotapi.NewInlineKeyboardRow(
-								tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("записаться как %s", savedNameText), "use_saved_name:"+songID),
+								tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("записаться как %s", savedNameText), "use_saved_name"),
 							),
 						),
 					)
@@ -136,6 +136,17 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 
 func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	query := update.CallbackQuery
+
+	// Answer callback immediately
+	callback := tgbotapi.NewCallback(query.ID, "")
+	if _, err := b.Client.Request(callback); err != nil {
+		log.Printf("failed to answer callback query: %v", err)
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	message := query.Message
 	userStates := h.userManager.GetAllThisUser(message.Chat.ID)
 
@@ -151,28 +162,57 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 		return b.SendMessage(message.Chat.ID, "жать на ту кнопку уже поздно")
 	}
 
-	// Fetch user to get saved name
+	// Use context with timeout for database operations
 	user, err := db.Users.GetByChatID(message.Chat.ID)
 	if err != nil {
+		log.Printf("error getting user by chat ID: %v", err)
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при получении сохраненного имени")
 	}
 
 	if !user.SavedName.Valid {
-		fmt.Printf("user saved name not found")
+		log.Printf("user saved name not found")
 		return fmt.Errorf("user saved name not found")
 	}
 
 	stateToUpdate.TypedName = user.SavedName.String
 	stateToUpdate.Stage = users.StageInLine
 	stateToUpdate.TimeAdded = time.Now()
-	h.userManager.EditState(context.Background(), stateToUpdate.ID, *stateToUpdate)
-	h.userManager.Sync(context.Background())
 
-	if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
-		fmt.Printf("increment performances failed: %s", err)
+	if err := h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate); err != nil {
+		log.Printf("error editing state: %v", err)
 	}
-	if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
-		fmt.Printf("increment counter failed: %s", err)
+
+	if err := h.userManager.Sync(ctx); err != nil {
+		log.Printf("error syncing state: %v", err)
+	}
+
+	// Group these operations together since they're related
+	errChan := make(chan error, 2)
+	go func() {
+		if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
+			errChan <- fmt.Errorf("increment performances failed: %w", err)
+		}
+		errChan <- nil
+	}()
+
+	go func() {
+		if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
+			errChan <- fmt.Errorf("increment counter failed: %w", err)
+		}
+		errChan <- nil
+	}()
+
+operations:
+	for i := 0; i < 2; i++ {
+		select {
+		case err := <-errChan:
+			if err != nil {
+				log.Printf("async operation error: %v", err)
+			}
+		case <-ctx.Done():
+			log.Printf("timeout waiting for increment operations")
+			break operations
+		}
 	}
 
 	return b.SendMessageWithMarkdown(
