@@ -97,7 +97,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		// Prepare user state
 		userState := users.UserState{
 			ID:       len(userStates) + 1,
-			Username: message.From.UserName,
+			Username: strings.ReplaceAll(message.From.UserName, "_", "\\_"),
 			TgName:   fmt.Sprintf("%s %s", message.From.FirstName, message.From.LastName),
 			SongID:   songID,
 			SongName: db.Songbook.FormatSongName(song),
@@ -115,7 +115,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 				fmt.Sprintf("так-так. кто будет песть песню \"%s\"?\n\nнажмите на кнопку или просто напишите новое имя", userState.SongName),
 				tgbotapi.NewInlineKeyboardMarkup(
 					tgbotapi.NewInlineKeyboardRow(
-						tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("записаться как %s", savedNameText), "use_saved_name"),
+						tgbotapi.NewInlineKeyboardButtonData(fmt.Sprintf("записаться как %s", strings.ReplaceAll(savedNameText, "\\_", "_")), "use_saved_name"),
 					),
 				),
 			)
@@ -241,7 +241,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	}
 
 	// Update the found state
-	stateToUpdate.TypedName = message.Text
+	stateToUpdate.TypedName = strings.ReplaceAll(message.Text, "_", "\\_")
 	stateToUpdate.Stage = users.StageInLine
 	stateToUpdate.TimeAdded = time.Now()
 
@@ -261,7 +261,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessageWithMarkdown(
 		message.Chat.ID,
 		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
-			message.Text, stateToUpdate.SongName, stateToUpdate.SongLink),
+			stateToUpdate.TypedName, stateToUpdate.SongName, stateToUpdate.SongLink),
 		false,
 	)
 }
@@ -283,7 +283,7 @@ func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 			// Handle name input for song selection
 			userStates := userManager.GetAll()
 			for _, state := range userStates {
-				if state.Stage == users.StageAskingName && state.Username == update.Message.From.UserName {
+				if state.Stage == users.StageAskingName && state.ChatID == update.Message.Chat.ID {
 					return handlers.nameHandler(b, update)
 				}
 			}
@@ -296,7 +296,7 @@ func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 	commandHandlers := common.GetCommandHandlers(userManager)
 	commandHandlers["start"] = handlers.startHandler
 
-	callbackHandlers := common.GetCallbackHandlers()
+	callbackHandlers := common.GetCallbackHandlers(userManager)
 	callbackHandlers["use_saved_name"] = handlers.useSavedNameHandler
 
 	go clientBot.Start(
