@@ -114,3 +114,38 @@ func (s *SongbookType) IncrementSongCounter(songID string) error {
 
 	return nil
 }
+
+func (s *SongbookType) SearchSongs(query string) []Song {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	query = strings.ToLower(query)
+	queryParts := strings.Fields(query)
+
+	var results []Song
+
+	for _, song := range s.songs {
+		title := strings.ToLower(song.Title)
+		artist := strings.ToLower(song.Artist.String)
+		artistName := strings.ToLower(song.ArtistName.String)
+
+		// Check if all query parts match either title or artist
+		allPartsMatch := true
+		for _, part := range queryParts {
+			matches := strings.Contains(title, part) ||
+				strings.Contains(artist, part) ||
+				strings.Contains(artistName, part)
+
+			if !matches {
+				allPartsMatch = false
+				break
+			}
+		}
+
+		if allPartsMatch {
+			results = append(results, song)
+		}
+	}
+
+	return results
+}

@@ -6,6 +6,7 @@ import (
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/common"
+	"github.com/sukalov/karaokebot/internal/db"
 	"github.com/sukalov/karaokebot/internal/state"
 )
 
@@ -67,15 +68,29 @@ func (h *AdminHandlers) abortHandler(b *bot.Bot, update tgbotapi.Update) error {
 }
 
 func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUsernames []string) {
+	// Create handlers
 	handlers := NewAdminHandlers(userManager, adminUsernames)
+	songManager := db.Songbook
+	searchHandlers := NewSearchHandler(adminUsernames, songManager)
 
+	// Get common handlers
 	commandHandlers := common.GetCommandHandlers(userManager)
+	messageHandlers := common.GetMessageHandlers()
+	callbackHandlers := common.GetCallbackHandlers(userManager)
+
+	// Add admin command handlers
 	commandHandlers["clear_line"] = handlers.clearLineHandler
 	commandHandlers["rebuild"] = handlers.RebuildHandler
+	commandHandlers["findsong"] = searchHandlers.findSongHandler
 
-	callbackHandlers := common.GetCallbackHandlers(userManager)
+	// Add message handler
+	messageHandlers = append(messageHandlers, searchHandlers.messageHandler)
+
+	// Add callback handlers for all possible prefixes
+	callbackHandlers["edit_song"] = searchHandlers.callbackHandler
 	callbackHandlers["abort_clear_line"] = handlers.abortHandler
 	callbackHandlers["confirm_clear_line"] = handlers.confirmHandler
 
-	go adminBot.Start(commandHandlers, nil, callbackHandlers)
+	// Start the bot
+	go adminBot.Start(commandHandlers, messageHandlers, callbackHandlers)
 }

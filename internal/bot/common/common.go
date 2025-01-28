@@ -34,11 +34,7 @@ func GetMessageHandlers() []func(b *bot.Bot, update tgbotapi.Update) error {
 
 // GetCallbackHandlers returns common callback handlers
 func GetCallbackHandlers(userManager *state.StateManager) map[string]func(b *bot.Bot, update tgbotapi.Update) error {
-	handlers := newCommonHandlers(userManager)
-	return map[string]func(b *bot.Bot, update tgbotapi.Update) error{
-		"line_prev": handlers.lineHandler,
-		"line_next": handlers.lineHandler,
-	}
+	return map[string]func(b *bot.Bot, update tgbotapi.Update) error{}
 }
 
 func newCommonHandlers(userManager *state.StateManager) *CommonHandlers {

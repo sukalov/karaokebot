@@ -1,7 +1,9 @@
 package bot
 
 import (
+	"fmt"
 	"log"
+	"strings"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -62,6 +64,9 @@ func (b *Bot) processUpdate(
 	messageHandlers []func(b *Bot, update tgbotapi.Update) error,
 	callbackHandlers map[string]func(b *Bot, update tgbotapi.Update) error,
 ) {
+	if update.CallbackQuery != nil {
+		fmt.Println(update.CallbackQuery.Data)
+	}
 	// Handle command updates
 	if update.Message != nil && update.Message.IsCommand() {
 		if handler, exists := commandHandlers[update.Message.Command()]; exists {
@@ -74,7 +79,14 @@ func (b *Bot) processUpdate(
 
 	// Handle callback queries
 	if update.CallbackQuery != nil {
-		if handler, exists := callbackHandlers[update.CallbackQuery.Data]; exists {
+		parts := strings.SplitN(update.CallbackQuery.Data, ":", 2)
+		var query string
+		if len(parts) == 2 {
+			query = parts[0]
+		} else {
+			query = update.CallbackQuery.Data
+		}
+		if handler, exists := callbackHandlers[query]; exists {
 			if err := handler(b, update); err != nil {
 				log.Printf("[%s] callback handler error: %v", b.name, err)
 			}
