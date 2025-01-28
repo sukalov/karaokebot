@@ -55,7 +55,9 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 		return b.SendMessage(message.Chat.ID, "в очереди никого нет")
 	}
 
-	lineMessage := "очередь:\n\n"
+	// lineMessage := "очередь:\n\n"
+	lineMessage := ""
+	i := 0
 	for idx, userState := range lineUsers {
 		lineMessage += fmt.Sprintf(
 			"%d. %s\n   песня: [%s](%s)\n   добавлен: %s\n   юзернейм: @%s\n\n",
@@ -66,6 +68,12 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 			utils.ConvertToMoscowTime(userState.TimeAdded),
 			userState.Username,
 		)
+		i += 1
+		if i == 20 {
+			b.SendMessageWithMarkdown(message.Chat.ID, lineMessage, true)
+			i = 0
+			lineMessage = ""
+		}
 	}
 
 	return b.SendMessageWithMarkdown(message.Chat.ID, lineMessage, true)
