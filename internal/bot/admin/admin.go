@@ -71,6 +71,7 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 
 	commandHandlers := common.GetCommandHandlers(userManager)
 	commandHandlers["clear_line"] = handlers.clearLineHandler
+	commandHandlers["rebuild"] = handlers.RebuildHandler
 
 	callbackHandlers := common.GetCallbackHandlers(userManager)
 	callbackHandlers["abort_clear_line"] = handlers.abortHandler
