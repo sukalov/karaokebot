@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
@@ -50,6 +51,8 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 	if len(lineUsers) == 0 {
 		return b.SendMessage(message.Chat.ID, "в очереди никого нет")
 	}
+
+	sort.Sort(state.ByTimeAdded(lineUsers))
 
 	// lineMessage := "очередь:\n\n"
 	lineMessage := ""

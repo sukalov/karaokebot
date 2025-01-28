@@ -14,6 +14,12 @@ type StateManager struct {
 	list []users.UserState
 }
 
+type ByTimeAdded []users.UserState
+
+func (a ByTimeAdded) Len() int           { return len(a) }
+func (a ByTimeAdded) Less(i, j int) bool { return a[i].TimeAdded.Before(a[j].TimeAdded) }
+func (a ByTimeAdded) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
 func NewStateManager() *StateManager {
 	return &StateManager{
 		list: []users.UserState{},
