@@ -30,11 +30,15 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 	text := message.Text
 	userStates := h.userManager.GetAll()
 	ctx := context.Background()
-
 	err := db.Users.Register(update)
+
 	if err != nil {
 		log.Printf("error registering user: %v", err)
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при регистрации")
+	}
+
+	if !h.userManager.IsOpen() {
+		return b.SendMessage(update.Message.From.ID, "УВЫ! запись на караоке уже закрыта.\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
 	}
 
 	// Extract song ID from /start command
@@ -143,6 +147,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 		log.Printf("failed to answer callback query: %v", err)
 		return err
 	}
+	fmt.Println("1")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -150,6 +155,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	message := query.Message
 	userStates := h.userManager.GetAllThisUser(message.Chat.ID)
 
+	fmt.Println("2")
 	var stateToUpdate *users.UserState
 	for i, state := range userStates {
 		if state.Stage == users.StageAskingName {
@@ -157,10 +163,24 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 			break
 		}
 	}
+	fmt.Println("3")
 
 	if stateToUpdate == nil {
 		return b.SendMessage(message.Chat.ID, "жать на ту кнопку уже поздно")
 	}
+	fmt.Println("4")
+
+	if !h.userManager.IsOpen() {
+		ctx := context.Background()
+		if err := h.userManager.RemoveState(ctx, stateToUpdate.ID); err != nil {
+			fmt.Printf("error cleaning up user state: %s", err)
+			fmt.Println(message.Chat.ID)
+			return b.SendMessage(message.Chat.ID, "УВЫ!")
+		}
+		return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта.\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
+	}
+
+	fmt.Println("5")
 
 	// Use context with timeout for database operations
 	user, err := db.Users.GetByChatID(message.Chat.ID)

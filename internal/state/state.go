@@ -46,6 +46,10 @@ func (sm *StateManager) Init() error {
 	return nil
 }
 
+func (sm *StateManager) IsOpen() bool {
+	return sm.open
+}
+
 func (sm *StateManager) AddUser(ctx context.Context, state users.UserState) error {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -126,6 +130,10 @@ func (sm *StateManager) EditState(ctx context.Context, stateID int, newState use
 	for i, state := range sm.list {
 		if state.ID == stateID {
 			sm.list[i] = newState
+			if err := redis.SetList(ctx, sm.list); err != nil {
+				fmt.Printf("error happened while updating the redis list: %s", err)
+				return err
+			}
 			return nil
 		}
 	}
@@ -137,6 +145,23 @@ func (sm *StateManager) Sync(ctx context.Context) error {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	if err := redis.SetList(ctx, sm.list); err != nil {
+		fmt.Printf("error happened while updating the redis list: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (sm *StateManager) RemoveState(ctx context.Context, stateID int) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	result := []users.UserState{}
+	for _, state := range sm.list {
+		if state.ID != stateID {
+			result = append(result, state)
+		}
+	}
+	sm.list = result
+	if err := redis.SetList(ctx, result); err != nil {
 		fmt.Printf("error happened while updating the redis list: %s", err)
 		return err
 	}
