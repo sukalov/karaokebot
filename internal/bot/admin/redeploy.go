@@ -54,7 +54,9 @@ func (h *AdminHandlers) RebuildHandler(b *bot.Bot, update tgbotapi.Update) error
 
 	// Read and log the response body for debugging
 	body, _ := io.ReadAll(resp.Body)
-	fmt.Printf("GitHub Response: %s\n", string(body))
+	if string(body) != "" {
+		fmt.Printf("GitHub Response: %s\n", string(body))
+	}
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
 		return b.SendMessage(update.Message.Chat.ID,

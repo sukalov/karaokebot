@@ -82,12 +82,14 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["clear_line"] = handlers.clearLineHandler
 	commandHandlers["rebuild"] = handlers.RebuildHandler
 	commandHandlers["findsong"] = searchHandlers.findSongHandler
+	commandHandlers["cancel"] = searchHandlers.cancelAction
 
 	// Add message handler
 	messageHandlers = append(messageHandlers, searchHandlers.messageHandler)
 
 	// Add callback handlers for all possible prefixes
 	callbackHandlers["edit_song"] = searchHandlers.callbackHandler
+	callbackHandlers["edit_field"] = searchHandlers.callbackHandler
 	callbackHandlers["abort_clear_line"] = handlers.abortHandler
 	callbackHandlers["confirm_clear_line"] = handlers.confirmHandler
 

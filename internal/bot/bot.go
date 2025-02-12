@@ -79,9 +79,9 @@ func (b *Bot) processUpdate(
 
 	// Handle callback queries
 	if update.CallbackQuery != nil {
-		parts := strings.SplitN(update.CallbackQuery.Data, ":", 2)
+		parts := strings.SplitN(update.CallbackQuery.Data, ":", 3)
 		var query string
-		if len(parts) == 2 {
+		if len(parts) > 1 {
 			query = parts[0]
 		} else {
 			query = update.CallbackQuery.Data
@@ -91,6 +91,8 @@ func (b *Bot) processUpdate(
 				log.Printf("[%s] callback handler error: %v", b.name, err)
 			}
 			return
+		} else {
+			b.SendMessage(update.Message.Chat.ID, "команда не распознана")
 		}
 	}
 
