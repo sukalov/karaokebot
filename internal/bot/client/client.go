@@ -147,7 +147,6 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 		log.Printf("failed to answer callback query: %v", err)
 		return err
 	}
-	fmt.Println("1")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -155,7 +154,6 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	message := query.Message
 	userStates := h.userManager.GetAllThisUser(message.Chat.ID)
 
-	fmt.Println("2")
 	var stateToUpdate *users.UserState
 	for i, state := range userStates {
 		if state.Stage == users.StageAskingName {
@@ -163,24 +161,19 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 			break
 		}
 	}
-	fmt.Println("3")
 
 	if stateToUpdate == nil {
 		return b.SendMessage(message.Chat.ID, "жать на ту кнопку уже поздно")
 	}
-	fmt.Println("4")
 
 	if !h.userManager.IsOpen() {
 		ctx := context.Background()
 		if err := h.userManager.RemoveState(ctx, stateToUpdate.ID); err != nil {
 			fmt.Printf("error cleaning up user state: %s", err)
-			fmt.Println(message.Chat.ID)
 			return b.SendMessage(message.Chat.ID, "УВЫ!")
 		}
 		return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта.\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
 	}
-
-	fmt.Println("5")
 
 	// Use context with timeout for database operations
 	user, err := db.Users.GetByChatID(message.Chat.ID)
@@ -258,6 +251,15 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	// If no matching state found, return
 	if stateToUpdate == nil {
 		return fmt.Errorf("no state with asking_name was found")
+	}
+
+	if !h.userManager.IsOpen() {
+		ctx := context.Background()
+		if err := h.userManager.RemoveState(ctx, stateToUpdate.ID); err != nil {
+			fmt.Printf("error cleaning up user state: %s", err)
+			return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта. (простите, мы понимаем, вы были уже так близко)\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
+		}
+		return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта. (простите, мы понимаем, вы были уже так близко)\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
 	}
 
 	// Update the found state
