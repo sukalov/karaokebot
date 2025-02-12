@@ -67,6 +67,28 @@ func (h *AdminHandlers) abortHandler(b *bot.Bot, update tgbotapi.Update) error {
 	return b.SendMessage(update.CallbackQuery.From.ID, "кнопка уже не работает")
 }
 
+func (h *AdminHandlers) openLineHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+	ctx := context.Background()
+	if err := h.userManager.OpenList(ctx); err != nil {
+		return b.SendMessage(update.Message.From.ID, "случилась ошибка")
+	}
+	return b.SendMessage(update.Message.From.ID, "список открыт для записи")
+}
+
+func (h *AdminHandlers) closeLineHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+	ctx := context.Background()
+	if err := h.userManager.CloseList(ctx); err != nil {
+		return b.SendMessage(update.Message.From.ID, "случилась ошибка")
+	}
+	return b.SendMessage(update.Message.From.ID, "запись закрыта")
+}
+
 func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUsernames []string) {
 	// Create handlers
 	handlers := NewAdminHandlers(userManager, adminUsernames)
@@ -83,6 +105,8 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["rebuild"] = handlers.RebuildHandler
 	commandHandlers["findsong"] = searchHandlers.findSongHandler
 	commandHandlers["cancel"] = searchHandlers.cancelAction
+	commandHandlers["open"] = handlers.openLineHandler
+	commandHandlers["close"] = handlers.closeLineHandler
 
 	// Add message handler
 	messageHandlers = append(messageHandlers, searchHandlers.messageHandler)

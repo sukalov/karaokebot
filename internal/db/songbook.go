@@ -210,3 +210,64 @@ func (s *SongbookType) UpdateSong(song Song) error {
 
 	return fmt.Errorf("song not found in memory: %s", song.ID)
 }
+
+func (s *SongbookType) NewSong(song Song) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+
+	query := `
+		INSERT songbook
+			category = ?, 
+			title = ?, 
+			link = ?, 
+			artist = ?, 
+			artist_name = ?, 
+			additional_chords = ?, 
+			excluded = ?,
+			id = ?`
+	defer func() {
+		cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("error: timeout in query '%s' canceled after 5 seconds: %v",
+				query,
+				ctx.Err(),
+			)
+		}
+	}()
+
+	result, err := Database.ExecContext(ctx, query,
+		song.Category,
+		song.Title,
+		song.Link,
+		song.Artist,
+		song.ArtistName,
+		song.AdditionalChords,
+		song.Excluded,
+		song.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to insert song: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no row was affected (???): %s", song.ID)
+	}
+
+	// Update the in-memory array
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for i, existingSong := range s.songs {
+		if existingSong.ID == song.ID {
+			song.Counter = existingSong.Counter
+			s.songs[i] = song
+			return nil
+		}
+	}
+
+	return fmt.Errorf("song not found in memory: %s", song.ID)
+}

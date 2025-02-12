@@ -32,3 +32,26 @@ func GetList(ctx context.Context) ([]users.UserState, error) {
 	}
 	return list, nil
 }
+
+func GetOpen(ctx context.Context) (bool, error) {
+	data, err := Client.Get(ctx, "open").Bytes()
+	if err != nil {
+		if err == redisClient.Nil {
+			return false, nil
+		}
+		return false, err
+	}
+	var open bool
+	if err := json.Unmarshal(data, &open); err != nil {
+		return false, err
+	}
+	return open, nil
+}
+
+func SetOpen(ctx context.Context, open bool) error {
+	openJSON, err := json.Marshal(open)
+	if err != nil {
+		return err
+	}
+	return Client.Set(ctx, "open", openJSON, 0).Err()
+}

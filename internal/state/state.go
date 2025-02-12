@@ -12,6 +12,7 @@ import (
 type StateManager struct {
 	mu   sync.RWMutex
 	list []users.UserState
+	open bool
 }
 
 type ByTimeAdded []users.UserState
@@ -23,6 +24,7 @@ func (a ByTimeAdded) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func NewStateManager() *StateManager {
 	return &StateManager{
 		list: []users.UserState{},
+		open: false,
 	}
 }
 
@@ -32,10 +34,15 @@ func (sm *StateManager) Init() error {
 	defer sm.mu.Unlock()
 	// Retrieve the list from Redis
 	list, err := redis.GetList(ctx)
+	open, err2 := redis.GetOpen(ctx)
 	if err != nil {
 		return err
 	}
+	if err2 != nil {
+		return err2
+	}
 	sm.list = list
+	sm.open = open
 	return nil
 }
 
@@ -45,6 +52,28 @@ func (sm *StateManager) AddUser(ctx context.Context, state users.UserState) erro
 	sm.list = append(sm.list, state)
 	if err := redis.SetList(ctx, sm.list); err != nil {
 		fmt.Printf("error happened while adding to redis list: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (sm *StateManager) OpenList(ctx context.Context) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.open = true
+	if err := redis.SetOpen(ctx, true); err != nil {
+		fmt.Printf("error happened while saving list state to redis: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (sm *StateManager) CloseList(ctx context.Context) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.open = false
+	if err := redis.SetOpen(ctx, false); err != nil {
+		fmt.Printf("error happened while saving list state to redis: %s", err)
 		return err
 	}
 	return nil
