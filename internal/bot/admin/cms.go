@@ -384,10 +384,10 @@ func (h *SearchHandler) newSongHandler(b *bot.Bot, update tgbotapi.Update) error
 	}
 
 	chatID := update.Message.Chat.ID
-	if err := b.SendMessageWithMarkdown(chatID, "*скопируйте* следующее сообщение и вставьте в него данные новой песни ровно *внутрь квадрятных скобок*. не убирайте квадратные скобки, редактируйте только внтури них, звёздочкой помечены обязательные поля.\n\nп.с. в графе \"исполнитель\" пишется либо название группы либо фамилия исполнителя.", true); err != nil {
+	if err := b.SendMessageWithMarkdown(chatID, "*скопируйте* следующее вообщение (отдним кликом по тексту) и вставьте в него данные новой песни ровно *внутрь квадрятных скобок*. не убирайте квадратные скобки, редактируйте только внтури них, звёздочкой помечены обязательные поля.\n\nп.с. в графе \"исполнитель\" пишется либо название группы либо фамилия исполнителя.", true); err != nil {
 		return err
 	}
-	return b.SendMessage(chatID, "/newsongform\n\nисполнитель - []*\nимя исполниеля - []\nназвание песни - []*\nссылка на аккорды - []*")
+	return b.SendMessageWithMarkdown(chatID, "`/newsongform\n\nисполнитель - []*\nимя исполниеля - []\nназвание песни - []*\nссылка на аккорды - []*`", false)
 }
 
 func (h *SearchHandler) newSongFormHandler(b *bot.Bot, update tgbotapi.Update) error {
