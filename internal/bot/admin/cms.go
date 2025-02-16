@@ -3,7 +3,10 @@ package admin
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
 	"strings"
+	"sync"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
@@ -16,6 +19,7 @@ type SearchHandler struct {
 	awaitingSearch map[int64]bool
 	editingSong    map[int64]string // chatID -> songID
 	editingField   map[int64]string // chatID -> field name
+	mu             sync.RWMutex
 }
 
 func NewSearchHandler(adminUsernames []string, songManager *db.SongbookType) *SearchHandler {
@@ -30,6 +34,7 @@ func NewSearchHandler(adminUsernames []string, songManager *db.SongbookType) *Se
 		awaitingSearch: make(map[int64]bool),
 		editingSong:    make(map[int64]string),
 		editingField:   make(map[int64]string),
+		mu:             sync.RWMutex{},
 	}
 }
 
@@ -45,11 +50,14 @@ func (h *SearchHandler) cancelAction(b *bot.Bot, update tgbotapi.Update) error {
 }
 
 func (h *SearchHandler) findSongHandler(b *bot.Bot, update tgbotapi.Update) error {
+	h.mu.Lock()
 	if !h.admins[update.Message.From.UserName] {
+		h.mu.Unlock()
 		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
 	}
 
 	h.awaitingSearch[update.Message.Chat.ID] = true
+	h.mu.Unlock()
 	return b.SendMessage(update.Message.Chat.ID, "здесь можно найти песню и отредактировать. напишите название песни или артиста")
 }
 
@@ -97,25 +105,6 @@ func (h *SearchHandler) handleEditSong(b *bot.Bot, chatID int64, songID string) 
 			h.songManager.FormatSongName(song)),
 		keyboard)
 }
-
-// func (h *SearchHandler) handleEditField(b *bot.Bot, chatID int64, songID string, field string) error {
-// 	_, found := h.songManager.FindSongByID(songID)
-// 	if !found {
-// 		return b.SendMessage(chatID, "песня не найдена")
-// 	}
-
-// 	h.editingSong[chatID] = songID
-// 	h.editingField[chatID] = field
-
-// 	var message string
-// 	if field == "excluded" {
-// 		message = "песня исключена из поиска? (ответьте 'да' или 'нет')"
-// 	} else {
-// 		message = fmt.Sprintf("введите новое значение для поля '%s':", getFieldDisplayName(field))
-// 	}
-
-// 	return b.SendMessage(chatID, message)
-// }
 
 func (h *SearchHandler) messageHandler(b *bot.Bot, update tgbotapi.Update) error {
 	if update.CallbackQuery != nil {
@@ -387,4 +376,117 @@ func (h *SearchHandler) getCurrentFieldValue(song db.Song, field string) string 
 	default:
 		return "неизвестное поле"
 	}
+}
+
+func (h *SearchHandler) newSongHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+
+	chatID := update.Message.Chat.ID
+	if err := b.SendMessageWithMarkdown(chatID, "*скопируйте* следующее сообщение и вставьте в него данные новой песни ровно *внутрь квадрятных скобок*. не убирайте квадратные скобки, редактируйте только внтури них, звёздочкой помечены обязательные поля.\n\nп.с. в графе \"исполнитель\" пишется либо название группы либо фамилия исполнителя.", true); err != nil {
+		return err
+	}
+	return b.SendMessage(chatID, "/newsongform\n\nисполнитель - []*\nимя исполниеля - []\nназвание песни - []*\nссылка на аккорды - []*")
+}
+
+func (h *SearchHandler) newSongFormHandler(b *bot.Bot, update tgbotapi.Update) error {
+	h.mu.Lock()
+	chatID := update.Message.Chat.ID
+
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+
+	song, err := parseNewSongForm(update.Message.Text)
+	if err != nil {
+		return err
+	}
+
+	// if err := h.songManager.NewSong(newSong); err != nil {
+	// 	return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
+	// }
+
+	return b.SendMessage(chatID, song.String())
+}
+
+func parseNewSongForm(message string) (*db.Song, error) {
+	// check if message starts with the command
+	if !strings.HasPrefix(message, "/newsongform") {
+		return nil, fmt.Errorf("message should start with /newsongform")
+	}
+
+	// initialize empty song
+	song := &db.Song{
+		ID:       generateRandomID(), // you'll need to implement this
+		Counter:  0,
+		Excluded: 0,
+	}
+
+	// split message into lines
+	lines := strings.Split(message, "\n")
+	if len(lines) < 5 { // command + 4 fields
+		return nil, fmt.Errorf("incomplete form: expected 4 fields")
+	}
+
+	// helper function to extract content from brackets
+	extractBrackets := func(line string) string {
+		start := strings.Index(line, "[")
+		end := strings.Index(line, "]")
+		if start == -1 || end == -1 || start >= end {
+			return ""
+		}
+		return strings.TrimSpace(line[start+1 : end])
+	}
+
+	// process each line
+	for _, line := range lines[1:] { // skip command line
+		parts := strings.Split(line, "-")
+		if len(parts) != 2 {
+			continue
+		}
+
+		field := strings.TrimSpace(parts[0])
+		value := extractBrackets(parts[1])
+
+		switch field {
+		case "исполнитель":
+			song.Artist = sql.NullString{
+				String: value,
+				Valid:  value != "",
+			}
+		case "имя исполниеля":
+			song.ArtistName = sql.NullString{
+				String: value,
+				Valid:  value != "",
+			}
+		case "название песни":
+			if value == "" {
+				return nil, fmt.Errorf("название песни is required")
+			}
+			song.Title = value
+		case "ссылка на аккорды":
+			if value == "" {
+				return nil, fmt.Errorf("ссылка на аккорды is required")
+			}
+			song.Link = value
+		}
+	}
+
+	// final validation
+	if song.Title == "" || song.Link == "" {
+		return nil, fmt.Errorf("required fields are missing")
+	}
+
+	return song, nil
+}
+
+func generateRandomID() string {
+	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
+	var seededRand = rand.New(rand.NewSource(time.Now().UnixNano()))
+	b := make([]byte, 6)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return string(b)
 }

@@ -271,3 +271,36 @@ func (s *SongbookType) NewSong(song Song) error {
 
 	return fmt.Errorf("song not found in memory: %s", song.ID)
 }
+
+func (s *Song) String() string {
+	builder := strings.Builder{}
+
+	builder.WriteString(fmt.Sprintf("ID: %s\n", s.ID))
+
+	if s.Category != "" {
+		builder.WriteString(fmt.Sprintf("категория: %s\n", s.Category))
+	}
+
+	builder.WriteString(fmt.Sprintf("название: %s\n", s.Title))
+	builder.WriteString(fmt.Sprintf("ссылка: %s\n", s.Link))
+
+	if s.Artist.Valid {
+		builder.WriteString(fmt.Sprintf("исполнитель: %s\n", s.Artist.String))
+	}
+
+	if s.ArtistName.Valid {
+		builder.WriteString(fmt.Sprintf("имя исполнителя: %s\n", s.ArtistName.String))
+	}
+
+	if s.AdditionalChords.Valid {
+		builder.WriteString(fmt.Sprintf("доп аккорды: %s\n", s.AdditionalChords.String))
+	}
+
+	if s.Excluded != 0 {
+		builder.WriteString("исключена из поиска\n")
+	}
+
+	builder.WriteString(fmt.Sprintf("счётчик: %d", s.Counter))
+
+	return builder.String()
+}

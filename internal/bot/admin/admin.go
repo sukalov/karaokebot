@@ -107,6 +107,8 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["cancel"] = searchHandlers.cancelAction
 	commandHandlers["open"] = handlers.openLineHandler
 	commandHandlers["close"] = handlers.closeLineHandler
+	commandHandlers["newsong"] = searchHandlers.newSongHandler
+	commandHandlers["newsongform"] = searchHandlers.newSongFormHandler
 
 	// Add message handler
 	messageHandlers = append(messageHandlers, searchHandlers.messageHandler)
