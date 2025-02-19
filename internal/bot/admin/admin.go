@@ -116,6 +116,7 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	// Add callback handlers for all possible prefixes
 	callbackHandlers["edit_song"] = searchHandlers.callbackHandler
 	callbackHandlers["edit_field"] = searchHandlers.callbackHandler
+	callbackHandlers["select_category"] = searchHandlers.selectCategoryCallbackHandler
 	callbackHandlers["abort_clear_line"] = handlers.abortHandler
 	callbackHandlers["confirm_clear_line"] = handlers.confirmHandler
 

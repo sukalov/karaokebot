@@ -60,6 +60,14 @@ func (s *SongbookType) init() error {
 	return nil
 }
 
+func (s *SongbookType) ValidateCategory(category string) bool {
+	switch category {
+	case "русский рок", "русская поп-музыка", "советское", "детские песни", "зарубежное", "разное":
+		return true
+	}
+	return false
+}
+
 func (s *SongbookType) FindSongByID(id string) (Song, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -215,15 +223,17 @@ func (s *SongbookType) NewSong(song Song) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	query := `
-		INSERT songbook
-			category = ?, 
-			title = ?, 
-			link = ?, 
-			artist = ?, 
-			artist_name = ?, 
-			additional_chords = ?, 
-			excluded = ?,
-			id = ?`
+		INSERT INTO songbook (
+			category, 
+			title, 
+			link, 
+			artist, 
+			artist_name, 
+			additional_chords, 
+			excluded,
+			id,
+			counter
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -243,6 +253,7 @@ func (s *SongbookType) NewSong(song Song) error {
 		song.AdditionalChords,
 		song.Excluded,
 		song.ID,
+		song.Counter,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert song: %w", err)
@@ -256,23 +267,14 @@ func (s *SongbookType) NewSong(song Song) error {
 	if rowsAffected == 0 {
 		return fmt.Errorf("no row was affected (???): %s", song.ID)
 	}
-
-	// Update the in-memory array
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.songs = append(s.songs, song)
 
-	for i, existingSong := range s.songs {
-		if existingSong.ID == song.ID {
-			song.Counter = existingSong.Counter
-			s.songs[i] = song
-			return nil
-		}
-	}
-
-	return fmt.Errorf("song not found in memory: %s", song.ID)
+	return nil
 }
 
-func (s *Song) String() string {
+func (s *Song) Stringify() string {
 	builder := strings.Builder{}
 
 	builder.WriteString(fmt.Sprintf("ID: %s\n", s.ID))

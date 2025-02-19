@@ -17,9 +17,19 @@ type SearchHandler struct {
 	admins         map[string]bool
 	songManager    *db.SongbookType
 	awaitingSearch map[int64]bool
-	editingSong    map[int64]string // chatID -> songID
-	editingField   map[int64]string // chatID -> field name
+	editingSong    map[int64]string  // chatID -> songID
+	editingField   map[int64]string  // chatID -> field name
+	addingSong     map[int64]db.Song // chatID -> song
 	mu             sync.RWMutex
+}
+
+var categories = map[string]string{
+	"russian_rock": "русский рок",
+	"soviet":       "советское",
+	"foreign":      "зарубежное",
+	"for_kids":     "детские песни",
+	"russian_pop":  "русская поп-музыка",
+	"different":    "разное",
 }
 
 func NewSearchHandler(adminUsernames []string, songManager *db.SongbookType) *SearchHandler {
@@ -34,11 +44,14 @@ func NewSearchHandler(adminUsernames []string, songManager *db.SongbookType) *Se
 		awaitingSearch: make(map[int64]bool),
 		editingSong:    make(map[int64]string),
 		editingField:   make(map[int64]string),
+		addingSong:     make(map[int64]db.Song),
 		mu:             sync.RWMutex{},
 	}
 }
 
 func (h *SearchHandler) cancelAction(b *bot.Bot, update tgbotapi.Update) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	if !h.admins[update.Message.From.UserName] {
 		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
 	}
@@ -46,6 +59,7 @@ func (h *SearchHandler) cancelAction(b *bot.Bot, update tgbotapi.Update) error {
 	h.awaitingSearch[chatID] = false
 	delete(h.editingSong, chatID)
 	delete(h.editingField, chatID)
+	delete(h.addingSong, chatID)
 	return b.SendMessage(chatID, "все действия по сонгбуку завершены")
 }
 
@@ -251,6 +265,7 @@ func getFieldDisplayName(field string) string {
 	}
 }
 
+// this handler handles callbacks of two types: edit_song and edit_field
 func (h *SearchHandler) callbackHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 	if update.CallbackQuery == nil {
@@ -264,12 +279,11 @@ func (h *SearchHandler) callbackHandler(b *bot.Bot, update tgbotapi.Update) erro
 
 	if strings.HasPrefix(data, "edit_song:") {
 		songID := strings.TrimPrefix(data, "edit_song:")
-		fmt.Printf("handling edit_song for ID: %s\n", songID)
 		if err := h.handleEditSong(b, chatID, songID); err != nil {
 			fmt.Printf("error in handleEditSong: %v\n", err)
 			return b.SendMessage(chatID, fmt.Sprintf("ошибка: %v", err))
 		}
-		return nil
+		return b.SendMessage(chatID, "неизвестная команда")
 	}
 
 	if strings.HasPrefix(data, "edit_field:") {
@@ -391,7 +405,6 @@ func (h *SearchHandler) newSongHandler(b *bot.Bot, update tgbotapi.Update) error
 }
 
 func (h *SearchHandler) newSongFormHandler(b *bot.Bot, update tgbotapi.Update) error {
-	h.mu.Lock()
 	chatID := update.Message.Chat.ID
 
 	if !h.admins[update.Message.From.UserName] {
@@ -400,14 +413,58 @@ func (h *SearchHandler) newSongFormHandler(b *bot.Bot, update tgbotapi.Update) e
 
 	song, err := parseNewSongForm(update.Message.Text)
 	if err != nil {
-		return err
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при обработке формы: %v", err))
 	}
 
 	// if err := h.songManager.NewSong(newSong); err != nil {
 	// 	return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
 	// }
 
-	return b.SendMessage(chatID, song.String())
+	if err := h.handleNewSongForm(b, chatID, song); err != nil {
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при обработке формы: %v", err))
+	}
+
+	return nil
+}
+
+func (h *SearchHandler) handleNewSongForm(b *bot.Bot, chatID int64, song *db.Song) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	savedSong := h.addingSong[chatID]
+	if savedSong.ID != "" {
+		delete(h.addingSong, chatID)
+	}
+
+	h.addingSong[chatID] = *song
+
+	var rows [][]tgbotapi.InlineKeyboardButton
+	categories := []struct {
+		name    string
+		display string
+	}{
+		{"russian_rock", "русский рок"},
+		{"soviet", "советское"},
+		{"foreign", "зарубежное"},
+		{"for_kids", "детские песни"},
+		{"russian_pop", "русская поп-музыка"},
+		{"different", "разное"}}
+
+	for _, category := range categories {
+		row := []tgbotapi.InlineKeyboardButton{
+			tgbotapi.NewInlineKeyboardButtonData(
+				fmt.Sprint(category.display),
+				fmt.Sprintf("select_category:%s", category.name),
+			),
+		}
+		rows = append(rows, row)
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	return b.SendMessageWithButtons(chatID,
+		fmt.Sprintf("%s\n\nосталось определить её в какую-нибудь категорию\n\nчтобы завершить нажмите /cancel",
+			song.Stringify()),
+		keyboard)
 }
 
 func parseNewSongForm(message string) (*db.Song, error) {
@@ -416,17 +473,16 @@ func parseNewSongForm(message string) (*db.Song, error) {
 		return nil, fmt.Errorf("message should start with /newsongform")
 	}
 
-	// initialize empty song
 	song := &db.Song{
-		ID:       generateRandomID(), // you'll need to implement this
+		ID:       generateRandomID(),
 		Counter:  0,
 		Excluded: 0,
 	}
 
 	// split message into lines
 	lines := strings.Split(message, "\n")
-	if len(lines) < 5 { // command + 4 fields
-		return nil, fmt.Errorf("incomplete form: expected 4 fields")
+	if len(lines) < 3 {
+		return nil, fmt.Errorf("incomplete form")
 	}
 
 	// helper function to extract content from brackets
@@ -440,11 +496,12 @@ func parseNewSongForm(message string) (*db.Song, error) {
 	}
 
 	// process each line
-	for _, line := range lines[1:] { // skip command line
+	for _, line := range lines[1:] {
 		parts := strings.Split(line, "-")
 		if len(parts) != 2 {
 			continue
 		}
+		fmt.Println(parts)
 
 		field := strings.TrimSpace(parts[0])
 		value := extractBrackets(parts[1])
@@ -462,14 +519,17 @@ func parseNewSongForm(message string) (*db.Song, error) {
 			}
 		case "название песни":
 			if value == "" {
-				return nil, fmt.Errorf("название песни is required")
+				return nil, fmt.Errorf("должно быть название песни")
 			}
 			song.Title = value
+
 		case "ссылка на аккорды":
 			if value == "" {
-				return nil, fmt.Errorf("ссылка на аккорды is required")
+				return nil, fmt.Errorf("должна быть ссылка на аккорды")
 			}
 			song.Link = value
+		default:
+			return nil, fmt.Errorf("неизвестное поле: %s", field)
 		}
 	}
 
@@ -489,4 +549,48 @@ func generateRandomID() string {
 		b[i] = charset[seededRand.Intn(len(charset))]
 	}
 	return string(b)
+}
+
+func (h *SearchHandler) selectCategoryCallbackHandler(b *bot.Bot, update tgbotapi.Update) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if update.CallbackQuery == nil {
+		return nil
+	}
+
+	data := update.CallbackQuery.Data
+	chatID := update.CallbackQuery.Message.Chat.ID
+
+	fmt.Printf("received callback: %s, chatID: %d\n", data, chatID)
+
+	if strings.HasPrefix(data, "select_category:") {
+		category := strings.TrimPrefix(data, "select_category:")
+		if err := h.handleSelectCategory(b, chatID, category); err != nil {
+			fmt.Printf("error in handleEditSong: %v\n", err)
+			return fmt.Errorf("ошибка: %v", err)
+		}
+		return nil
+	}
+
+	fmt.Printf("unhandled callback data: %s\n", data)
+	return b.SendMessage(chatID, "неизвестная команда")
+}
+
+func (h *SearchHandler) handleSelectCategory(b *bot.Bot, chatID int64, category string) error {
+	song := h.addingSong[chatID]
+	if song.ID == "" {
+		return b.SendMessage(chatID, "эта кнопка уже не работает. добавьте песню заново")
+	}
+	song.Category = categories[category]
+
+	if !db.Songbook.ValidateCategory(song.Category) {
+		return b.SendMessage(chatID, "неверная категория")
+	}
+
+	if err := h.songManager.NewSong(song); err != nil {
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
+	}
+
+	return b.SendMessage(chatID, fmt.Sprintf("песня добавлена \n\n%s", song.Stringify()))
 }
