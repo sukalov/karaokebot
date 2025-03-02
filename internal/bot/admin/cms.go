@@ -597,5 +597,5 @@ func (h *SearchHandler) handleSelectCategory(b *bot.Bot, chatID int64, category 
 		return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
 	}
 	delete(h.addingSong, chatID)
-	return b.SendMessage(chatID, fmt.Sprintf("песня добавлена \n\n%s", song.Stringify()))
+	return b.SendMessage(chatID, fmt.Sprintf("песня добавлена \n\n%s\n\nне забудьте после всех изменений нажать /rebuild чтобы они появились на сайте", song.Stringify()))
 }
