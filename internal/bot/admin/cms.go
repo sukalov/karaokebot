@@ -214,7 +214,7 @@ func (h *SearchHandler) handleFieldUpdate(b *bot.Bot, chatID int64, songID strin
 
 	return b.SendMessage(chatID,
 		fmt.Sprintf("поле успешно обновлено!\nтекущие данные песни:\n%s",
-			h.songManager.FormatSongName(song)))
+			song.Stringify()))
 }
 
 func (h *SearchHandler) updateSongField(song *db.Song, field, value string) error {
