@@ -492,16 +492,22 @@ func parseNewSongForm(message string) (*db.Song, error) {
 		if start == -1 || end == -1 || start >= end {
 			return ""
 		}
-		return strings.TrimSpace(line[start+1 : end])
+		// Clean up any special characters like * or \
+		value := strings.TrimSpace(line[start+1 : end])
+		return strings.TrimRight(value, "*\\")
 	}
 
 	// process each line
 	for _, line := range lines[1:] {
-		parts := strings.Split(line, "-")
+		// Skip empty lines
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "-", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		fmt.Println(parts)
 
 		field := strings.TrimSpace(parts[0])
 		value := extractBrackets(parts[1])
@@ -522,7 +528,6 @@ func parseNewSongForm(message string) (*db.Song, error) {
 				return nil, fmt.Errorf("должно быть название песни")
 			}
 			song.Title = value
-
 		case "ссылка на аккорды":
 			if value == "" {
 				return nil, fmt.Errorf("должна быть ссылка на аккорды")
@@ -591,6 +596,6 @@ func (h *SearchHandler) handleSelectCategory(b *bot.Bot, chatID int64, category 
 	if err := h.songManager.NewSong(song); err != nil {
 		return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
 	}
-
+	delete(h.addingSong, chatID)
 	return b.SendMessage(chatID, fmt.Sprintf("песня добавлена \n\n%s", song.Stringify()))
 }
