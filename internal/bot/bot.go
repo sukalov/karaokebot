@@ -113,6 +113,7 @@ func (b *Bot) Stop() {
 
 func (b *Bot) SendMessage(chatID int64, text string) error {
 	msg := tgbotapi.NewMessage(chatID, text)
+	msg.DisableWebPagePreview = true
 	_, err := b.Client.Send(msg)
 	return err
 }
@@ -133,6 +134,7 @@ func (b *Bot) SendMessageWithButtons(
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = keyboard
 	msg.ParseMode = "Markdown"
+	msg.DisableWebPagePreview = true
 
 	_, err := b.Client.Send(msg)
 	return err

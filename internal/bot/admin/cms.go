@@ -214,7 +214,7 @@ func (h *SearchHandler) handleFieldUpdate(b *bot.Bot, chatID int64, songID strin
 
 	return b.SendMessage(chatID,
 		fmt.Sprintf("поле успешно обновлено!\nтекущие данные песни:\n%s",
-			song.Stringify()))
+			song.Stringify(false)))
 }
 
 func (h *SearchHandler) updateSongField(song *db.Song, field, value string) error {
@@ -283,7 +283,7 @@ func (h *SearchHandler) callbackHandler(b *bot.Bot, update tgbotapi.Update) erro
 			fmt.Printf("error in handleEditSong: %v\n", err)
 			return b.SendMessage(chatID, fmt.Sprintf("ошибка: %v", err))
 		}
-		return b.SendMessage(chatID, "неизвестная команда")
+		return nil
 	}
 
 	if strings.HasPrefix(data, "edit_field:") {
@@ -420,14 +420,14 @@ func (h *SearchHandler) newSongFormHandler(b *bot.Bot, update tgbotapi.Update) e
 	// 	return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
 	// }
 
-	if err := h.handleNewSongForm(b, chatID, song); err != nil {
-		return b.SendMessage(chatID, fmt.Sprintf("ошибка при обработке формы: %v", err))
+	if err := h.requestCategoryForNewSong(b, chatID, song); err != nil {
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при отправке сообщения для выбора категории: %v", err))
 	}
 
 	return nil
 }
 
-func (h *SearchHandler) handleNewSongForm(b *bot.Bot, chatID int64, song *db.Song) error {
+func (h *SearchHandler) requestCategoryForNewSong(b *bot.Bot, chatID int64, song *db.Song) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -463,7 +463,7 @@ func (h *SearchHandler) handleNewSongForm(b *bot.Bot, chatID int64, song *db.Son
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
 	return b.SendMessageWithButtons(chatID,
 		fmt.Sprintf("%s\n\nосталось определить её в какую-нибудь категорию\n\nчтобы завершить нажмите /cancel",
-			song.Stringify()),
+			song.Stringify(true)),
 		keyboard)
 }
 
@@ -485,32 +485,34 @@ func parseNewSongForm(message string) (*db.Song, error) {
 		return nil, fmt.Errorf("incomplete form")
 	}
 
-	// helper function to extract content from brackets
-	extractBrackets := func(line string) string {
-		start := strings.Index(line, "[")
-		end := strings.Index(line, "]")
-		if start == -1 || end == -1 || start >= end {
-			return ""
-		}
-		// Clean up any special characters like * or \
-		value := strings.TrimSpace(line[start+1 : end])
-		return strings.TrimRight(value, "*\\")
-	}
-
 	// process each line
 	for _, line := range lines[1:] {
 		// Skip empty lines
-		if strings.TrimSpace(line) == "" {
+		line = strings.TrimSpace(line)
+		if line == "" {
 			continue
 		}
 
-		parts := strings.SplitN(line, "-", 2)
-		if len(parts) != 2 {
-			continue
+		// Find the first dash that separates field name from value
+		dashIndex := strings.Index(line, "-")
+		if dashIndex <= 0 {
+			continue // Skip lines without a dash
 		}
 
-		field := strings.TrimSpace(parts[0])
-		value := extractBrackets(parts[1])
+		field := strings.TrimSpace(line[:dashIndex])
+		valueWithBrackets := strings.TrimSpace(line[dashIndex+1:])
+
+		// Extract value from between brackets, handling the case where URL might break parsing
+		startBracket := strings.Index(valueWithBrackets, "[")
+		endBracket := strings.LastIndex(valueWithBrackets, "]")
+
+		if startBracket == -1 || endBracket == -1 || startBracket >= endBracket {
+			continue // Skip if brackets aren't properly formatted
+		}
+
+		value := strings.TrimSpace(valueWithBrackets[startBracket+1 : endBracket])
+		// Remove trailing asterisks or other markers
+		value = strings.TrimRight(value, "*\\")
 
 		switch field {
 		case "исполнитель":
@@ -597,5 +599,5 @@ func (h *SearchHandler) handleSelectCategory(b *bot.Bot, chatID int64, category 
 		return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
 	}
 	delete(h.addingSong, chatID)
-	return b.SendMessage(chatID, fmt.Sprintf("песня добавлена \n\n%s\n\nне забудьте после всех изменений нажать /rebuild чтобы они появились на сайте", song.Stringify()))
+	return b.SendMessage(chatID, fmt.Sprintf("песня добавлена \n\n%s\n\nне забудьте после всех изменений нажать /rebuild чтобы они появились на сайте", song.Stringify(false)))
 }

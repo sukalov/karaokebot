@@ -274,7 +274,7 @@ func (s *SongbookType) NewSong(song Song) error {
 	return nil
 }
 
-func (s *Song) Stringify() string {
+func (s *Song) Stringify(markdown bool) string {
 	builder := strings.Builder{}
 
 	builder.WriteString(fmt.Sprintf("ID: %s\n", s.ID))
@@ -284,7 +284,12 @@ func (s *Song) Stringify() string {
 	}
 
 	builder.WriteString(fmt.Sprintf("название: %s\n", s.Title))
-	builder.WriteString(fmt.Sprintf("ссылка: %s\n", s.Link))
+
+	if markdown {
+		builder.WriteString(fmt.Sprintf("[ссылка на аккорды](%s)\n", s.Link))
+	} else {
+		builder.WriteString(fmt.Sprintf("ссылка: %s\n", s.Link))
+	}
 
 	if s.Artist.Valid {
 		builder.WriteString(fmt.Sprintf("исполнитель: %s\n", s.Artist.String))
