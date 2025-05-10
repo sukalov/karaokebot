@@ -115,8 +115,8 @@ func (h *SearchHandler) handleEditSong(b *bot.Bot, chatID int64, songID string) 
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
 	return b.SendMessageWithButtons(chatID,
-		fmt.Sprintf("редактирование песни:\n%s\nвыберите поле для редактирования:\n\nчтобы завершить нажмите /cancel",
-			h.songManager.FormatSongName(song)),
+		fmt.Sprintf("редактирование песни:\n[%s](%s)\nвыберите поле для редактирования:\n\nчтобы завершить нажмите /cancel\n\nчтобы найти новую песню нажмите /findsong",
+			h.songManager.FormatSongName(song), song.Link),
 		keyboard)
 }
 
