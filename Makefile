@@ -27,14 +27,22 @@ docker-push:
 dev:
 	air
 
+# Clean up old Docker images
+.PHONY: docker-clean
+docker-clean:
+	ssh root@142.93.170.197 "\
+		docker stop karaoke || true; \
+		docker rm karaoke || true; \
+		docker image prune -f \
+	"
+
 # Deployment command
 .PHONY: deploy
-deploy: build docker-build docker-push
+deploy: build docker-build docker-push docker-clean
 	ssh root@142.93.170.197 "\
 		docker pull sukalov/karaokebot:latest; \
-		docker stop karaokebot || true; \
-		docker rm karaokebot || true; \
-		docker run --name karaokebot \
+		docker run --name karaoke \
+		--restart always \
 		--env-file .env -v \
 		$(pwd)/root/.env:/root/.env \
 		-d sukalov/karaokebot:latest \
