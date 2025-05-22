@@ -20,6 +20,7 @@ type Song struct {
 	AdditionalChords sql.NullString
 	Excluded         int
 	Counter          int
+	CreatedAt        int64
 }
 
 type SongbookType struct {
@@ -45,7 +46,7 @@ func (s *SongbookType) init() error {
 	var songs []Song
 	for rows.Next() {
 		var song Song
-		if err := rows.Scan(&song.ID, &song.Category, &song.Title, &song.Artist, &song.ArtistName, &song.Link, &song.AdditionalChords, &song.Excluded, &song.Counter); err != nil {
+		if err := rows.Scan(&song.ID, &song.Category, &song.Title, &song.Artist, &song.ArtistName, &song.Link, &song.AdditionalChords, &song.Excluded, &song.Counter, &song.CreatedAt); err != nil {
 			log.Printf("error scanning row: %v", err)
 			continue
 		}
@@ -137,7 +138,6 @@ func (s *SongbookType) SearchSongs(query string) []Song {
 		artist := strings.ToLower(song.Artist.String)
 		artistName := strings.ToLower(song.ArtistName.String)
 
-		// Check if all query parts match either title or artist
 		allPartsMatch := true
 		for _, part := range queryParts {
 			matches := strings.Contains(title, part) ||
@@ -162,15 +162,16 @@ func (s *SongbookType) UpdateSong(song Song) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	fmt.Print("START UPDATE")
 	query := `
-		UPDATE songbook 
-		SET category = ?, 
-			title = ?, 
-			link = ?, 
-			artist = ?, 
-			artist_name = ?, 
-			additional_chords = ?, 
-			excluded = ?
-		WHERE id = ?`
+        UPDATE songbook 
+        SET category = ?, 
+            title = ?, 
+            link = ?, 
+            artist = ?, 
+            artist_name = ?, 
+            additional_chords = ?, 
+            excluded = ?,
+            created_at = ?
+        WHERE id = ?`
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -189,6 +190,7 @@ func (s *SongbookType) UpdateSong(song Song) error {
 		song.ArtistName,
 		song.AdditionalChords,
 		song.Excluded,
+		song.CreatedAt,
 		song.ID,
 	)
 	if err != nil {
@@ -204,7 +206,6 @@ func (s *SongbookType) UpdateSong(song Song) error {
 		return fmt.Errorf("no song found with id: %s", song.ID)
 	}
 
-	// Update the in-memory array
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -223,17 +224,18 @@ func (s *SongbookType) NewSong(song Song) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
 	query := `
-		INSERT INTO songbook (
-			category, 
-			title, 
-			link, 
-			artist, 
-			artist_name, 
-			additional_chords, 
-			excluded,
-			id,
-			counter
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        INSERT INTO songbook (
+            category, 
+            title, 
+            link, 
+            artist, 
+            artist_name, 
+            additional_chords, 
+            excluded,
+            id,
+            counter,
+            created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
@@ -254,6 +256,7 @@ func (s *SongbookType) NewSong(song Song) error {
 		song.Excluded,
 		song.ID,
 		song.Counter,
+		song.CreatedAt,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to insert song: %w", err)
@@ -307,7 +310,9 @@ func (s *Song) Stringify(markdown bool) string {
 		builder.WriteString("исключена из поиска\n")
 	}
 
-	builder.WriteString(fmt.Sprintf("счётчик: %d", s.Counter))
+	builder.WriteString(fmt.Sprintf("счётчик: %d\n", s.Counter))
+
+	builder.WriteString(fmt.Sprintf("создана: %s", time.Unix(s.CreatedAt, 0).Format("2006-01-02 15:04:05")))
 
 	return builder.String()
 }

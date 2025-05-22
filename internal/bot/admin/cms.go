@@ -127,12 +127,10 @@ func (h *SearchHandler) messageHandler(b *bot.Bot, update tgbotapi.Update) error
 
 	chatID := update.Message.Chat.ID
 
-	// Handle search functionality
 	if h.awaitingSearch[chatID] {
 		return h.handleSearch(b, update)
 	}
 
-	// Handle field editing
 	if songID, editing := h.editingSong[chatID]; editing {
 		fmt.Println(h.editingSong[chatID])
 		field := h.editingField[chatID]
@@ -148,20 +146,16 @@ func (h *SearchHandler) messageHandler(b *bot.Bot, update tgbotapi.Update) error
 }
 
 func (h *SearchHandler) handleSearch(b *bot.Bot, update tgbotapi.Update) error {
-	// Clear the awaiting state
 	delete(h.awaitingSearch, update.Message.Chat.ID)
 
-	// Search for songs
 	results := h.songManager.SearchSongs(update.Message.Text)
 
 	if len(results) == 0 {
 		return b.SendMessage(update.Message.Chat.ID, "ничего не найдено")
 	}
 
-	// Create keyboard with search results
 	var rows [][]tgbotapi.InlineKeyboardButton
 	for _, song := range results {
-		// Limit the number of results to prevent huge keyboards
 		if len(rows) >= 10 {
 			break
 		}
@@ -265,7 +259,6 @@ func getFieldDisplayName(field string) string {
 	}
 }
 
-// this handler handles callbacks of two types: edit_song and edit_field
 func (h *SearchHandler) callbackHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 	if update.CallbackQuery == nil {
@@ -358,7 +351,6 @@ func (h *SearchHandler) handleEditField(b *bot.Bot, chatID int64, songID string,
 	return nil
 }
 
-// Helper function to get current field value
 func (h *SearchHandler) getCurrentFieldValue(song db.Song, field string) string {
 	switch field {
 	case "category":
@@ -408,17 +400,13 @@ func (h *SearchHandler) newSongFormHandler(b *bot.Bot, update tgbotapi.Update) e
 	chatID := update.Message.Chat.ID
 
 	if !h.admins[update.Message.From.UserName] {
-		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+		return b.SendMessage(chatID, "вы не админ")
 	}
 
 	song, err := parseNewSongForm(update.Message.Text)
 	if err != nil {
 		return b.SendMessage(chatID, fmt.Sprintf("ошибка при обработке формы: %v", err))
 	}
-
-	// if err := h.songManager.NewSong(newSong); err != nil {
-	// 	return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
-	// }
 
 	if err := h.requestCategoryForNewSong(b, chatID, song); err != nil {
 		return b.SendMessage(chatID, fmt.Sprintf("ошибка при отправке сообщения для выбора категории: %v", err))
@@ -468,50 +456,44 @@ func (h *SearchHandler) requestCategoryForNewSong(b *bot.Bot, chatID int64, song
 }
 
 func parseNewSongForm(message string) (*db.Song, error) {
-	// check if message starts with the command
 	if !strings.HasPrefix(message, "/newsongform") {
 		return nil, fmt.Errorf("message should start with /newsongform")
 	}
 
 	song := &db.Song{
-		ID:       generateRandomID(),
-		Counter:  0,
-		Excluded: 0,
+		ID:        generateRandomID(),
+		Counter:   0,
+		Excluded:  0,
+		CreatedAt: time.Now().Unix(),
 	}
 
-	// split message into lines
 	lines := strings.Split(message, "\n")
 	if len(lines) < 3 {
 		return nil, fmt.Errorf("incomplete form")
 	}
 
-	// process each line
 	for _, line := range lines[1:] {
-		// Skip empty lines
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
 
-		// Find the first dash that separates field name from value
 		dashIndex := strings.Index(line, "-")
 		if dashIndex <= 0 {
-			continue // Skip lines without a dash
+			continue
 		}
 
 		field := strings.TrimSpace(line[:dashIndex])
 		valueWithBrackets := strings.TrimSpace(line[dashIndex+1:])
 
-		// Extract value from between brackets, handling the case where URL might break parsing
 		startBracket := strings.Index(valueWithBrackets, "[")
 		endBracket := strings.LastIndex(valueWithBrackets, "]")
 
 		if startBracket == -1 || endBracket == -1 || startBracket >= endBracket {
-			continue // Skip if brackets aren't properly formatted
+			continue
 		}
 
 		value := strings.TrimSpace(valueWithBrackets[startBracket+1 : endBracket])
-		// Remove trailing asterisks or other markers
 		value = strings.TrimRight(value, "*\\")
 
 		switch field {
@@ -540,7 +522,6 @@ func parseNewSongForm(message string) (*db.Song, error) {
 		}
 	}
 
-	// final validation
 	if song.Title == "" || song.Link == "" {
 		return nil, fmt.Errorf("required fields are missing")
 	}
