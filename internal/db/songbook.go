@@ -277,6 +277,54 @@ func (s *SongbookType) NewSong(song Song) error {
 	return nil
 }
 
+func (s *SongbookType) DeleteSong(songID string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	query := `DELETE FROM songbook WHERE id = ?`
+	defer func() {
+		cancel()
+		if ctx.Err() == context.DeadlineExceeded {
+			log.Printf("error: timeout in query '%s' canceled after 5 seconds: %v",
+				query,
+				ctx.Err(),
+			)
+		}
+	}()
+
+	result, err := Database.ExecContext(ctx, query, songID)
+	if err != nil {
+		return fmt.Errorf("failed to delete song from database: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to check rows affected after deletion: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no song found with id: %s to delete", songID)
+	}
+
+	// Remove from in-memory slice
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	foundIndex := -1
+	for i, song := range s.songs {
+		if song.ID == songID {
+			foundIndex = i
+			break
+		}
+	}
+
+	if foundIndex != -1 {
+		s.songs = append(s.songs[:foundIndex], s.songs[foundIndex+1:]...)
+	} else {
+		log.Printf("Warning: Song with ID %s not found in in-memory cache after successful database deletion.", songID)
+	}
+
+	return nil
+}
+
 func (s *Song) Stringify(markdown bool) string {
 	builder := strings.Builder{}
 

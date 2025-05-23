@@ -112,7 +112,13 @@ func (h *SearchHandler) handleEditSong(b *bot.Bot, chatID int64, songID string) 
 		}
 		rows = append(rows, row)
 	}
-
+	deleteButton := []tgbotapi.InlineKeyboardButton{
+		tgbotapi.NewInlineKeyboardButtonData(
+			fmt.Sprintln("УДАЛИТЬ ИЗ СОНГБУКА"),
+			fmt.Sprintf("delete_song:%s", songID),
+		),
+	}
+	rows = append(rows, deleteButton)
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
 	return b.SendMessageWithButtons(chatID,
 		fmt.Sprintf("редактирование песни:\n[%s](%s)\nвыберите поле для редактирования:\n\nчтобы завершить нажмите /cancel\n\nчтобы найти новую песню нажмите /findsong",
@@ -268,8 +274,6 @@ func (h *SearchHandler) callbackHandler(b *bot.Bot, update tgbotapi.Update) erro
 	data := update.CallbackQuery.Data
 	chatID := update.CallbackQuery.Message.Chat.ID
 
-	fmt.Printf("received callback: %s, chatID: %d\n", data, chatID)
-
 	if strings.HasPrefix(data, "edit_song:") {
 		songID := strings.TrimPrefix(data, "edit_song:")
 		if err := h.handleEditSong(b, chatID, songID); err != nil {
@@ -294,6 +298,15 @@ func (h *SearchHandler) callbackHandler(b *bot.Bot, update tgbotapi.Update) erro
 
 		if err := h.handleEditField(b, chatID, songID, field); err != nil {
 			fmt.Printf("error in handleEditField: %v\n", err)
+			return b.SendMessage(chatID, fmt.Sprintf("ошибка: %v", err))
+		}
+		return nil
+	}
+
+	if strings.HasPrefix(data, "delete_song:") {
+		songID := strings.TrimPrefix(data, "delete_song:")
+		if err := h.handleDeleteSong(b, chatID, songID); err != nil {
+			fmt.Printf("error in handleDeleteSong: %v\n", err)
 			return b.SendMessage(chatID, fmt.Sprintf("ошибка: %v", err))
 		}
 		return nil
@@ -349,6 +362,19 @@ func (h *SearchHandler) handleEditField(b *bot.Bot, chatID int64, songID string,
 
 	fmt.Printf("handleEditField completed successfully\n")
 	return nil
+}
+
+func (h *SearchHandler) handleDeleteSong(b *bot.Bot, chatID int64, songID string) error {
+	_, found := h.songManager.FindSongByID(songID)
+	if !found {
+		return fmt.Errorf("песня не найдена")
+	}
+
+	if err := h.songManager.DeleteSong(songID); err != nil {
+		return err
+	}
+
+	return b.SendMessage(chatID, "песня удалена")
 }
 
 func (h *SearchHandler) getCurrentFieldValue(song db.Song, field string) string {
