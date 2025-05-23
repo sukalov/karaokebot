@@ -94,7 +94,7 @@ func (h *SearchHandler) handleEditSong(b *bot.Bot, chatID int64, songID string) 
 		{"link", "ссылка", song.Link},
 		{"artist", "исполнитель", song.Artist.String},
 		{"artistname", "имя исполнителя", song.ArtistName.String},
-		{"additionalchords", "доп. аккорды", song.AdditionalChords.String},
+		{"additionalchords", "заметка:", song.AdditionalChords.String},
 		{"excluded", "исключена", h.formatExcluded(song.Excluded)},
 	}
 
@@ -257,7 +257,7 @@ func getFieldDisplayName(field string) string {
 	case "artistname":
 		return "имя исполнителя"
 	case "additionalchords":
-		return "дополнительные аккорды"
+		return "заметка"
 	case "excluded":
 		return "исключена"
 	default:

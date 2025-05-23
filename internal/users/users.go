@@ -12,6 +12,7 @@ type UserState struct {
 	SongID    string    `json:"song_id"`
 	SongName  string    `json:"song_name"`
 	SongLink  string    `json:"song_link"`
+	SongNote  string    `json:"additional_chords"`
 	Stage     string    `json:"stage"`
 	TimeAdded time.Time `json:"time_added"`
 	TypedName string    `json:"typed_name"`

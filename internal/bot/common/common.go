@@ -54,18 +54,24 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 	sort.Sort(state.ByTimeAdded(lineUsers))
 
-	// lineMessage := "очередь:\n\n"
 	lineMessage := ""
 	i := 0
 	for idx, userState := range lineUsers {
+		var note string
+		if userState.SongNote == "" {
+			note = ""
+		} else {
+			note = fmt.Sprintf("   заметка по песне: %s\n", userState.SongNote)
+		}
 		lineMessage += fmt.Sprintf(
-			"%d. %s\n   песня: [%s](%s)\n   добавлен: %s\n   юзернейм: @%s\n\n",
+			"%d. %s\n   песня: [%s](%s)\n   добавлен: %s\n   юзернейм: @%s\n%s\n",
 			idx+1,
 			userState.TypedName,
 			userState.SongName,
 			userState.SongLink,
 			utils.ConvertToMoscowTime(userState.TimeAdded),
 			userState.Username,
+			note,
 		)
 		i += 1
 		if i == 20 {

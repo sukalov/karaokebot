@@ -351,7 +351,7 @@ func (s *Song) Stringify(markdown bool) string {
 	}
 
 	if s.AdditionalChords.Valid {
-		builder.WriteString(fmt.Sprintf("доп аккорды: %s\n", s.AdditionalChords.String))
+		builder.WriteString(fmt.Sprintf("заметка к песне: %s\n", s.AdditionalChords.String))
 	}
 
 	if s.Excluded != 0 {

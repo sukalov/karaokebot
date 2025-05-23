@@ -68,6 +68,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 				state.SongID = songID
 				state.SongName = db.Songbook.FormatSongName(song)
 				state.SongLink = song.Link
+				state.SongNote = song.AdditionalChords.String
 				h.userManager.EditState(ctx, state.ID, state)
 				h.userManager.Sync(ctx)
 
@@ -105,6 +106,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			TgName:   fmt.Sprintf("%s %s", message.From.FirstName, message.From.LastName),
 			SongID:   songID,
 			SongName: db.Songbook.FormatSongName(song),
+			SongNote: song.AdditionalChords.String,
 			SongLink: song.Link,
 			ChatID:   message.Chat.ID,
 			Stage:    users.StageAskingName,
