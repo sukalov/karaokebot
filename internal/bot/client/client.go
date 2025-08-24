@@ -95,7 +95,8 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 
 		// If no existing state, create a new one
 		previousStates := h.userManager.GetAllThisUser(message.Chat.ID)
-		if len(previousStates) >= 3 {
+		limit := h.userManager.GetLimit()
+		if len(previousStates) >= limit {
 			return b.SendMessage(message.Chat.ID, "больше трёх раз записываться нельзя\n\nУВЫ!")
 		}
 

@@ -48,6 +48,27 @@ func (h *AdminHandlers) clearLineHandler(b *bot.Bot, update tgbotapi.Update) err
 	)
 }
 
+func (h *AdminHandlers) limitHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+
+	chatID := update.Message.Chat.ID
+	limit := h.userManager.GetLimit()
+	if limit == 3 {
+		return b.SendMessageWithButtons(chatID, "сейчас один человек может спеть максимум 3 песни", tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("убрать лимит", "disable_limit"),
+			),
+		))
+	}
+	return b.SendMessageWithButtons(chatID, "сейчас любой может петь сколько угодно раз", tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("включить лимит в три песни", "enable_limit"),
+		),
+	))
+}
+
 func (h *AdminHandlers) confirmHandler(b *bot.Bot, update tgbotapi.Update) error {
 	ctx := context.Background()
 	if h.clearInProgress[update.CallbackQuery.From.UserName] {
@@ -56,7 +77,6 @@ func (h *AdminHandlers) confirmHandler(b *bot.Bot, update tgbotapi.Update) error
 		return b.SendMessage(update.CallbackQuery.From.ID, "список очищен")
 	}
 	return b.SendMessage(update.CallbackQuery.From.ID, "кнопка уже не работает")
-
 }
 
 func (h *AdminHandlers) abortHandler(b *bot.Bot, update tgbotapi.Update) error {
@@ -89,6 +109,24 @@ func (h *AdminHandlers) closeLineHandler(b *bot.Bot, update tgbotapi.Update) err
 	return b.SendMessage(update.Message.From.ID, "запись закрыта")
 }
 
+func (h *AdminHandlers) enableLimitHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.CallbackQuery.From.UserName] {
+		return b.SendMessage(update.CallbackQuery.From.ID, "вы не админ")
+	}
+	ctx := context.Background()
+	h.userManager.SetLimit(ctx, 3)
+	return b.SendMessage(update.CallbackQuery.From.ID, "лимит ON. теперь каждый поёт не больше трёх раз")
+}
+
+func (h *AdminHandlers) disableLimitHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.CallbackQuery.From.UserName] {
+		return b.SendMessage(update.CallbackQuery.From.ID, "вы не админ")
+	}
+	ctx := context.Background()
+	h.userManager.SetLimit(ctx, 1000)
+	return b.SendMessage(update.CallbackQuery.From.ID, "лимит OFF. все поют сколько угодно")
+}
+
 func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUsernames []string) {
 	// Create handlers
 	handlers := NewAdminHandlers(userManager, adminUsernames)
@@ -109,6 +147,7 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["close"] = handlers.closeLineHandler
 	commandHandlers["newsong"] = searchHandlers.newSongHandler
 	commandHandlers["newsongform"] = searchHandlers.newSongFormHandler
+	commandHandlers["limit"] = handlers.limitHandler
 
 	// Add message handler
 	messageHandlers = append(messageHandlers, searchHandlers.messageHandler)
@@ -120,6 +159,8 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	callbackHandlers["select_category"] = searchHandlers.selectCategoryCallbackHandler
 	callbackHandlers["abort_clear_line"] = handlers.abortHandler
 	callbackHandlers["confirm_clear_line"] = handlers.confirmHandler
+	callbackHandlers["enable_limit"] = handlers.enableLimitHandler
+	callbackHandlers["disable_limit"] = handlers.disableLimitHandler
 
 	// Start the bot
 	go adminBot.Start(commandHandlers, messageHandlers, callbackHandlers)

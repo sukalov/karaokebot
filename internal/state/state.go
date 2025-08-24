@@ -10,9 +10,10 @@ import (
 )
 
 type StateManager struct {
-	mu   sync.RWMutex
-	list []users.UserState
-	open bool
+	mu    sync.RWMutex
+	list  []users.UserState
+	open  bool
+	limit int
 }
 
 type ByTimeAdded []users.UserState
@@ -23,8 +24,9 @@ func (a ByTimeAdded) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 func NewStateManager() *StateManager {
 	return &StateManager{
-		list: []users.UserState{},
-		open: false,
+		list:  []users.UserState{},
+		open:  false,
+		limit: 3,
 	}
 }
 
@@ -35,14 +37,19 @@ func (sm *StateManager) Init() error {
 	// Retrieve the list from Redis
 	list, err := redis.GetList(ctx)
 	open, err2 := redis.GetOpen(ctx)
+	limit, err3 := redis.GetLimit(ctx)
 	if err != nil {
 		return err
 	}
 	if err2 != nil {
 		return err2
 	}
+	if err3 != nil {
+		return err3
+	}
 	sm.list = list
 	sm.open = open
+	sm.limit = limit
 	return nil
 }
 
@@ -163,6 +170,21 @@ func (sm *StateManager) RemoveState(ctx context.Context, stateID int) error {
 	sm.list = result
 	if err := redis.SetList(ctx, result); err != nil {
 		fmt.Printf("error happened while updating the redis list: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (sm *StateManager) GetLimit() int {
+	return sm.limit
+}
+
+func (sm *StateManager) SetLimit(ctx context.Context, limit int) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.limit = limit
+	if err := redis.SetLimit(ctx, limit); err != nil {
+		fmt.Printf("error happened while updating the redis limit: %s", err)
 		return err
 	}
 	return nil

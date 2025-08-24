@@ -55,3 +55,26 @@ func SetOpen(ctx context.Context, open bool) error {
 	}
 	return Client.Set(ctx, "open", openJSON, 0).Err()
 }
+
+func GetLimit(ctx context.Context) (int, error) {
+	data, err := Client.Get(ctx, "limit").Bytes()
+	if err != nil {
+		if err == redisClient.Nil {
+			return 0, nil
+		}
+		return 0, err
+	}
+	var limit int
+	if err := json.Unmarshal(data, &limit); err != nil {
+		return 0, err
+	}
+	return limit, nil
+}
+
+func SetLimit(ctx context.Context, limit int) error {
+	limitJSON, err := json.Marshal(limit)
+	if err != nil {
+		return err
+	}
+	return Client.Set(ctx, "limit", limitJSON, 0).Err()
+}
