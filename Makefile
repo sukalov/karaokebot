@@ -30,7 +30,7 @@ dev:
 # Clean up old Docker images
 .PHONY: docker-clean
 docker-clean:
-	ssh root@142.93.170.197 "\
+	ssh root@209.38.216.252 "\
 		docker stop karaoke || true; \
 		docker rm karaoke || true; \
 		docker image prune -f \
@@ -39,7 +39,7 @@ docker-clean:
 # Deployment command
 .PHONY: deploy
 deploy: build docker-build docker-push docker-clean
-	ssh root@142.93.170.197 "\
+	ssh root@209.38.216.252 "\
 		docker pull sukalov/karaokebot:latest; \
 		docker run --name karaoke \
 		--restart always \
