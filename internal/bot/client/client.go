@@ -11,17 +11,20 @@ import (
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/common"
 	"github.com/sukalov/karaokebot/internal/db"
+	"github.com/sukalov/karaokebot/internal/lyrics"
 	"github.com/sukalov/karaokebot/internal/state"
 	"github.com/sukalov/karaokebot/internal/users"
 )
 
 type ClientHandlers struct {
-	userManager *state.StateManager
+	userManager   *state.StateManager
+	lyricsService *lyrics.Service
 }
 
 func NewClientHandlers(userManager *state.StateManager) *ClientHandlers {
 	return &ClientHandlers{
-		userManager: userManager,
+		userManager:   userManager,
+		lyricsService: lyrics.NewService(),
 	}
 }
 
@@ -69,6 +72,8 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 				state.SongName = db.Songbook.FormatSongName(song)
 				state.SongLink = song.Link
 				state.SongNote = song.AdditionalChords.String
+				state.LyricsURL = ""
+				state.LyricsText = ""
 				h.userManager.EditState(ctx, state.ID, state)
 				h.userManager.Sync(ctx)
 
@@ -102,15 +107,17 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 
 		// Prepare user state
 		userState := users.UserState{
-			ID:       len(userStates) + 1,
-			Username: strings.ReplaceAll(message.From.UserName, "_", "\\_"),
-			TgName:   fmt.Sprintf("%s %s", message.From.FirstName, message.From.LastName),
-			SongID:   songID,
-			SongName: db.Songbook.FormatSongName(song),
-			SongNote: song.AdditionalChords.String,
-			SongLink: song.Link,
-			ChatID:   message.Chat.ID,
-			Stage:    users.StageAskingName,
+			ID:         len(userStates) + 1,
+			Username:   strings.ReplaceAll(message.From.UserName, "_", "\\_"),
+			TgName:     fmt.Sprintf("%s %s", message.From.FirstName, message.From.LastName),
+			SongID:     songID,
+			SongName:   db.Songbook.FormatSongName(song),
+			SongNote:   song.AdditionalChords.String,
+			SongLink:   song.Link,
+			ChatID:     message.Chat.ID,
+			Stage:      users.StageAskingName,
+			LyricsURL:  "",
+			LyricsText: "",
 		}
 		h.userManager.AddUser(ctx, userState)
 		h.userManager.Sync(ctx)
@@ -231,6 +238,24 @@ operations:
 		}
 	}
 
+	// Fetch lyrics if it's an AmDm.ru URL
+	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
+		go func() {
+			lyricsResult, err := h.lyricsService.ExtractLyrics(stateToUpdate.SongLink)
+			if err != nil {
+				log.Printf("failed to fetch lyrics for song %s: %v", stateToUpdate.SongID, err)
+				return
+			}
+
+			// Send lyrics as separate message when ready
+			if lyricsResult.Text != "" {
+				if err := b.SendMessageWithMarkdown(message.Chat.ID, lyricsResult.Text, false); err != nil {
+					log.Printf("failed to send lyrics: %v", err)
+				}
+			}
+		}()
+	}
+
 	return b.SendMessageWithMarkdown(
 		message.Chat.ID,
 		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
@@ -283,6 +308,25 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	if err := db.Users.UpdateSavedName(stateToUpdate.ChatID, stateToUpdate.TypedName); err != nil {
 		fmt.Printf("increment counter failed: %s", err)
 	}
+
+	// Fetch lyrics if it's an AmDm.ru URL
+	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
+		go func() {
+			lyricsResult, err := h.lyricsService.ExtractLyrics(stateToUpdate.SongLink)
+			if err != nil {
+				log.Printf("failed to fetch lyrics for song %s: %v", stateToUpdate.SongID, err)
+				return
+			}
+
+			// Send lyrics as separate message when ready
+			if lyricsResult.Text != "" {
+				if err := b.SendMessageWithMarkdown(message.Chat.ID, lyricsResult.Text, false); err != nil {
+					log.Printf("failed to send lyrics: %v", err)
+				}
+			}
+		}()
+	}
+
 	return b.SendMessageWithMarkdown(
 		message.Chat.ID,
 		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
