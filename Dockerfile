@@ -1,5 +1,5 @@
 # trunk-ignore-all(checkov/CKV_DOCKER_3)
-FROM golang:1.23.4-alpine3.19 AS builder
+FROM golang:latest AS builder
 
 WORKDIR /app
 

@@ -1,7 +1,13 @@
 package admin
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
@@ -127,6 +133,85 @@ func (h *AdminHandlers) disableLimitHandler(b *bot.Bot, update tgbotapi.Update) 
 	return b.SendMessage(update.CallbackQuery.From.ID, "лимит OFF. все поют сколько угодно")
 }
 
+func (h *AdminHandlers) ShowPromoHandler(b *bot.Bot, update tgbotapi.Update) error {
+	return h.triggerGithubAction(b, update, "show-promo", "true")
+}
+
+func (h *AdminHandlers) HidePromoHandler(b *bot.Bot, update tgbotapi.Update) error {
+	return h.triggerGithubAction(b, update, "hide-promo", "false")
+}
+
+func (h *AdminHandlers) RebuildHandler(b *bot.Bot, update tgbotapi.Update) error {
+	return h.triggerGithubAction(b, update, "rebuild-trigger", "")
+}
+
+func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, eventType string, promoValue string) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+
+	githubWebhookURL := os.Getenv("GITHUB_REDEPLOY_HOOK")
+	githubToken := os.Getenv("GITHUB_PAT_TOKEN")
+
+	if githubWebhookURL == "" || githubToken == "" {
+		return b.SendMessage(update.Message.Chat.ID, "ошибка: не настроены webhook url или токен")
+	}
+
+	payload := map[string]interface{}{
+		"event_type": eventType,
+		"client_payload": map[string]string{
+			"unit":  fmt.Sprintf("rebuild triggered via telegram: %s", eventType),
+			"promo": promoValue,
+		},
+	}
+
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке payload: %v", err))
+	}
+
+	req, err := http.NewRequest("POST", githubWebhookURL, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании запроса: %v", err))
+	}
+
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Authorization", fmt.Sprintf("token %s", githubToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при запросе к github: %v", err))
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != "" {
+		fmt.Printf("GitHub Response: %s\n", string(body))
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+		return b.SendMessage(update.Message.Chat.ID,
+			fmt.Sprintf("ошибка: получен статус %d от github. ответ: %s",
+				resp.StatusCode, string(body)))
+	}
+
+	var message string
+	switch eventType {
+	case "rebuild-trigger":
+		message = "запущен процесс пересборки сайта"
+	case "show-promo":
+		message = "промо-кнопка показана"
+	case "hide-promo":
+		message = "промо-кнопка скрыта"
+	default:
+		message = fmt.Sprintf("запущен процесс: %s", eventType)
+	}
+
+	return b.SendMessage(update.Message.Chat.ID, message)
+}
+
 func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUsernames []string) {
 	// Create handlers
 	handlers := NewAdminHandlers(userManager, adminUsernames)
@@ -141,6 +226,8 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	// Add admin command handlers
 	commandHandlers["clear_line"] = handlers.clearLineHandler
 	commandHandlers["rebuild"] = handlers.RebuildHandler
+	commandHandlers["show_promo"] = handlers.ShowPromoHandler
+	commandHandlers["hide_promo"] = handlers.HidePromoHandler
 	commandHandlers["findsong"] = searchHandlers.findSongHandler
 	commandHandlers["cancel"] = searchHandlers.cancelAction
 	commandHandlers["open"] = handlers.openLineHandler

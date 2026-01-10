@@ -9,10 +9,7 @@ import (
 )
 
 func LoadEnv(requiredVars []string) (map[string]string, error) {
-	// Load the .env file
-	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("error loading .env file: %w", err)
-	}
+	_ = godotenv.Load()
 
 	envVars := make(map[string]string)
 
