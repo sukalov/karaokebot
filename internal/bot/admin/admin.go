@@ -134,15 +134,82 @@ func (h *AdminHandlers) disableLimitHandler(b *bot.Bot, update tgbotapi.Update) 
 }
 
 func (h *AdminHandlers) ShowPromoHandler(b *bot.Bot, update tgbotapi.Update) error {
-	return h.triggerGithubAction(b, update, "show-promo", "true")
+	return h.updatePromoAndRebuild(b, update, "true")
 }
 
 func (h *AdminHandlers) HidePromoHandler(b *bot.Bot, update tgbotapi.Update) error {
-	return h.triggerGithubAction(b, update, "hide-promo", "false")
+	return h.updatePromoAndRebuild(b, update, "false")
 }
 
 func (h *AdminHandlers) RebuildHandler(b *bot.Bot, update tgbotapi.Update) error {
 	return h.triggerGithubAction(b, update, "rebuild-trigger", "")
+}
+
+func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update, value string) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+
+	githubToken := os.Getenv("GITHUB_PAT_TOKEN")
+	repo := "sukalov/karaoke" // update this if needed
+
+	// 1. Update the GitHub Repository Variable
+	apiUrl := fmt.Sprintf("https://api.github.com/repos/%s/actions/variables/NEXT_PUBLIC_SHOW_PROMO", repo)
+	payload := map[string]string{"name": "NEXT_PUBLIC_SHOW_PROMO", "value": value}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке payload: %v", err))
+	}
+
+	req, err := http.NewRequest("PATCH", apiUrl, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании запроса: %v", err))
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("token %s", githubToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil || (resp.StatusCode != 204 && resp.StatusCode != 200) {
+		// If PATCH fails, it might not exist yet, try POST
+		apiUrl = fmt.Sprintf("https://api.github.com/repos/%s/actions/variables", repo)
+		jsonPayload, _ = json.Marshal(payload)
+		req, _ = http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonPayload))
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", githubToken))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err = client.Do(req)
+	}
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, "ошибка при обновлении переменной в GitHub")
+	}
+	defer resp.Body.Close()
+
+	// 2. Trigger the rebuild
+	rebuildUrl := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repo)
+	rebuildPayload := map[string]interface{}{
+		"event_type":     "rebuild-trigger",
+		"client_payload": map[string]string{"unit": "rebuild triggered via bot"},
+	}
+	jsonRebuild, err := json.Marshal(rebuildPayload)
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке rebuild payload: %v", err))
+	}
+
+	req, err = http.NewRequest("POST", rebuildUrl, bytes.NewBuffer(jsonRebuild))
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании rebuild запроса: %v", err))
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Authorization", fmt.Sprintf("token %s", githubToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err = client.Do(req)
+	if err != nil {
+		return b.SendMessage(update.Message.Chat.ID, "ошибка при запуске пересборки")
+	}
+	defer resp.Body.Close()
+
+	return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("состояние обновлено на %s, запущен процесс пересборки", value))
 }
 
 func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, eventType string, promoValue string) error {
