@@ -1,3 +1,4 @@
+// Package bot provides core functionality for the karaoke telegram bot.
 package bot
 
 import (

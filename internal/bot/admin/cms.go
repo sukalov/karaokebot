@@ -1,3 +1,4 @@
+// Package admin provides functionality for managing karaoke bot administrative operations.
 package admin
 
 import (
