@@ -7,6 +7,7 @@ import (
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/admin"
 	"github.com/sukalov/karaokebot/internal/bot/client"
+	"github.com/sukalov/karaokebot/internal/logger"
 	"github.com/sukalov/karaokebot/internal/state"
 	"github.com/sukalov/karaokebot/internal/utils"
 )
@@ -36,6 +37,10 @@ func main() {
 	clientBot, err := bot.New("ClientBot", tokens.clientBotToken)
 	if err != nil {
 		log.Fatalf("failed to create client bot: %v", err)
+	}
+
+	if err := logger.Init(clientBot); err != nil {
+		log.Printf("failed to initialize logger: %v", err)
 	}
 
 	// Setup and start admin bot handlers
