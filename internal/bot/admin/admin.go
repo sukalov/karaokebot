@@ -605,6 +605,7 @@ func (h *AdminHandlers) updatePromoVariablesAndRebuild(b *bot.Bot, chatID int64,
 		},
 	}
 	jsonRebuild, err := json.Marshal(rebuildPayload)
+	logger.Debug(fmt.Sprintf("Sending rebuild payload: %s", string(jsonRebuild)))
 	if err != nil {
 		return b.SendMessage(chatID, fmt.Sprintf("ошибка при подготовке rebuild payload: %v", err))
 	}
