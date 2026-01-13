@@ -36,7 +36,8 @@ func NewClient() *Client {
 
 // FetchPage fetches the HTML content from the given URL
 func (c *Client) FetchPage(url string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	fetchURL := strings.Replace(url, "123.amdm.ru", "amdm.ru", 1)
+	req, err := http.NewRequest("GET", fetchURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
