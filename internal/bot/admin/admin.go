@@ -10,11 +10,14 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/common"
 	"github.com/sukalov/karaokebot/internal/db"
+	"github.com/sukalov/karaokebot/internal/logger"
+	"github.com/sukalov/karaokebot/internal/lyrics"
 	"github.com/sukalov/karaokebot/internal/state"
 )
 
@@ -31,6 +34,7 @@ type AdminHandlers struct {
 	admins          map[string]bool
 	clearInProgress map[string]bool
 	promoEditState  map[int64]*PromoEditState
+	lyricsService   *lyrics.Service
 }
 
 func NewAdminHandlers(userManager *state.StateManager, adminUsernames []string) *AdminHandlers {
@@ -47,6 +51,7 @@ func NewAdminHandlers(userManager *state.StateManager, adminUsernames []string) 
 		admins:          admins,
 		clearInProgress: clearInProgress,
 		promoEditState:  promoEditState,
+		lyricsService:   lyrics.NewService(),
 	}
 }
 
@@ -86,6 +91,45 @@ func (h *AdminHandlers) limitHandler(b *bot.Bot, update tgbotapi.Update) error {
 			tgbotapi.NewInlineKeyboardButtonData("включить лимит в три песни", "enable_limit"),
 		),
 	))
+}
+
+func (h *AdminHandlers) testLyricsHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+
+	message := update.Message
+	text := message.Text
+
+	// Extract URL from command
+	args := strings.TrimPrefix(text, "/test_lyrics ")
+	if args == text {
+		return b.SendMessage(message.Chat.ID, "использование: /test_lyrics <URL>")
+	}
+
+	url := strings.TrimSpace(args)
+	logger.Info(fmt.Sprintf("Admin %s requested lyrics test for URL: %s", message.From.UserName, url))
+
+	if !strings.Contains(url, "amdm.ru") {
+		return b.SendMessage(message.Chat.ID, "поддерживаются только ссылки с amdm.ru")
+	}
+
+	b.SendMessage(message.Chat.ID, "загружаю слова...")
+
+	result, err := h.lyricsService.ExtractLyrics(url)
+	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to extract lyrics for test URL %s\nError: %v", url, err))
+		return b.SendMessage(message.Chat.ID, fmt.Sprintf("ошибка при извлечении слов: %v", err))
+	}
+
+	logger.Success(fmt.Sprintf("Lyrics test succeeded for URL: %s\nLength: %d chars", url, len(result.Text)))
+
+	if len(result.Text) > 3000 {
+		truncated := result.Text[:3000] + "\n\n... (обрезано, текст слишком длинный)"
+		return b.SendMessageWithMarkdown(message.Chat.ID, truncated, false)
+	}
+
+	return b.SendMessageWithMarkdown(message.Chat.ID, result.Text, false)
 }
 
 func (h *AdminHandlers) confirmHandler(b *bot.Bot, update tgbotapi.Update) error {
@@ -221,11 +265,17 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 	}
 	defer resp.Body.Close()
 
-	// 2. Trigger the rebuild
+	// 2. Wait for variable propagation
+	time.Sleep(5 * time.Second)
+
+	// 3. Trigger the rebuild with the value in payload to avoid race condition
 	rebuildUrl := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repo)
 	rebuildPayload := map[string]interface{}{
-		"event_type":     "rebuild-trigger",
-		"client_payload": map[string]string{"unit": "rebuild triggered via bot"},
+		"event_type": "rebuild-trigger",
+		"client_payload": map[string]string{
+			"unit":       "rebuild triggered via bot",
+			"promo_show": value,
+		},
 	}
 	jsonRebuild, err := json.Marshal(rebuildPayload)
 	if err != nil {
@@ -541,11 +591,18 @@ func (h *AdminHandlers) updatePromoVariablesAndRebuild(b *bot.Bot, chatID int64,
 		return b.SendMessage(chatID, fmt.Sprintf("ошибка при обновлении URL: %v", err))
 	}
 
-	// Trigger rebuild
+	// Wait a moment for repository variable propagation
+	time.Sleep(5 * time.Second)
+
+	// Trigger rebuild with new values in payload to avoid race condition
 	rebuildUrl := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repo)
 	rebuildPayload := map[string]interface{}{
-		"event_type":     "rebuild-trigger",
-		"client_payload": map[string]string{"unit": "rebuild triggered via promo edit"},
+		"event_type": "rebuild-trigger",
+		"client_payload": map[string]string{
+			"unit":       "rebuild triggered via promo edit",
+			"promo_text": text,
+			"promo_url":  promoURL,
+		},
 	}
 	jsonRebuild, err := json.Marshal(rebuildPayload)
 	if err != nil {
@@ -591,19 +648,32 @@ func (h *AdminHandlers) updateGitHubVariable(repo, token, name, value string) er
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
-	if err != nil || (resp.StatusCode != 204 && resp.StatusCode != 200) {
-		// If PATCH fails, it might not exist yet, try POST
-		apiUrl = fmt.Sprintf("https://api.github.com/repos/%s/actions/variables", repo)
-		req, _ = http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonPayload))
-		req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err = client.Do(req)
+	if err == nil && (resp.StatusCode == 204 || resp.StatusCode == 200) {
+		resp.Body.Close()
+		return nil
+	}
+	if resp != nil {
+		resp.Body.Close()
 	}
 
+	// PATCH failed, try POST to create the variable
+	apiUrl = fmt.Sprintf("https://api.github.com/repos/%s/actions/variables", repo)
+	req, err = http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err = client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 {
+		return fmt.Errorf("failed to create variable: %s", resp.Status)
+	}
 
 	return nil
 }
@@ -632,6 +702,7 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["newsong"] = searchHandlers.newSongHandler
 	commandHandlers["newsongform"] = searchHandlers.newSongFormHandler
 	commandHandlers["limit"] = handlers.limitHandler
+	commandHandlers["test_lyrics"] = handlers.testLyricsHandler
 
 	// Add message handler
 	messageHandlers = append(messageHandlers, handlers.handlePromoMessageInput, searchHandlers.messageHandler)
