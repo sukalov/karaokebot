@@ -11,6 +11,7 @@ import (
 	"github.com/sukalov/karaokebot/internal/bot"
 	"github.com/sukalov/karaokebot/internal/bot/common"
 	"github.com/sukalov/karaokebot/internal/db"
+	"github.com/sukalov/karaokebot/internal/logger"
 	"github.com/sukalov/karaokebot/internal/lyrics"
 	"github.com/sukalov/karaokebot/internal/state"
 	"github.com/sukalov/karaokebot/internal/users"
@@ -239,21 +240,43 @@ operations:
 	}
 
 	// Fetch lyrics if it's an AmDm.ru URL
+	logger.Debug(fmt.Sprintf("Checking song link for lyrics extraction (useSavedNameHandler)\nSong ID: %s\nSong Name: %s\nLink: %s\nUser: %s (%d)",
+		stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink, user.SavedName.String, message.Chat.ID))
+
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
+		logger.Info(fmt.Sprintf("AMDm URL detected for song: %s\nURL: %s\nUser: %s (%d)\nStarting lyrics extraction...",
+			stateToUpdate.SongName, stateToUpdate.SongLink, user.SavedName.String, message.Chat.ID))
+
 		go func() {
+			logger.Debug(fmt.Sprintf("Fetching lyrics for song %s from %s", stateToUpdate.SongID, stateToUpdate.SongLink))
 			lyricsResult, err := h.lyricsService.ExtractLyrics(stateToUpdate.SongLink)
 			if err != nil {
-				log.Printf("failed to fetch lyrics for song %s: %v", stateToUpdate.SongID, err)
+				logger.Error(fmt.Sprintf("Failed to fetch lyrics for song %s (%s)\nURL: %s\nUser: %s (%d)\nError: %v",
+					stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink, user.SavedName.String, message.Chat.ID, err))
 				return
 			}
 
+			logger.Success(fmt.Sprintf("Lyrics extracted successfully for song %s (%s)\nURL: %s\nLyrics length: %d characters",
+				stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink, len(lyricsResult.Text)))
+
 			// Send lyrics as separate message when ready
 			if lyricsResult.Text != "" {
+				logger.Debug(fmt.Sprintf("Sending lyrics to user %d for song %s", message.Chat.ID, stateToUpdate.SongID))
 				if err := b.SendMessageWithMarkdown(message.Chat.ID, lyricsResult.Text, false); err != nil {
-					log.Printf("failed to send lyrics: %v", err)
+					logger.Error(fmt.Sprintf("Failed to send lyrics to user %d for song %s\nError: %v",
+						message.Chat.ID, stateToUpdate.SongID, err))
+				} else {
+					logger.Success(fmt.Sprintf("Lyrics sent successfully to user %d for song %s",
+						message.Chat.ID, stateToUpdate.SongID))
 				}
+			} else {
+				logger.Error(fmt.Sprintf("Lyrics result is empty for song %s (%s)\nURL: %s",
+					stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink))
 			}
 		}()
+	} else {
+		logger.Debug(fmt.Sprintf("Song link is not from amdm.ru, skipping lyrics extraction (useSavedNameHandler)\nSong: %s\nLink: %s",
+			stateToUpdate.SongName, stateToUpdate.SongLink))
 	}
 
 	return b.SendMessageWithMarkdown(
@@ -310,21 +333,43 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	}
 
 	// Fetch lyrics if it's an AmDm.ru URL
+	logger.Debug(fmt.Sprintf("Checking song link for lyrics extraction (nameHandler)\nSong ID: %s\nSong Name: %s\nLink: %s\nUser: %s (%d)",
+		stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink, stateToUpdate.TypedName, message.Chat.ID))
+
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
+		logger.Info(fmt.Sprintf("AMDm URL detected for song: %s\nURL: %s\nUser: %s (%d)\nStarting lyrics extraction...",
+			stateToUpdate.SongName, stateToUpdate.SongLink, stateToUpdate.TypedName, message.Chat.ID))
+
 		go func() {
+			logger.Debug(fmt.Sprintf("Fetching lyrics for song %s from %s", stateToUpdate.SongID, stateToUpdate.SongLink))
 			lyricsResult, err := h.lyricsService.ExtractLyrics(stateToUpdate.SongLink)
 			if err != nil {
-				log.Printf("failed to fetch lyrics for song %s: %v", stateToUpdate.SongID, err)
+				logger.Error(fmt.Sprintf("Failed to fetch lyrics for song %s (%s)\nURL: %s\nUser: %s (%d)\nError: %v",
+					stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink, stateToUpdate.TypedName, message.Chat.ID, err))
 				return
 			}
 
+			logger.Success(fmt.Sprintf("Lyrics extracted successfully for song %s (%s)\nURL: %s\nLyrics length: %d characters",
+				stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink, len(lyricsResult.Text)))
+
 			// Send lyrics as separate message when ready
 			if lyricsResult.Text != "" {
+				logger.Debug(fmt.Sprintf("Sending lyrics to user %d for song %s", message.Chat.ID, stateToUpdate.SongID))
 				if err := b.SendMessageWithMarkdown(message.Chat.ID, lyricsResult.Text, false); err != nil {
-					log.Printf("failed to send lyrics: %v", err)
+					logger.Error(fmt.Sprintf("Failed to send lyrics to user %d for song %s\nError: %v",
+						message.Chat.ID, stateToUpdate.SongID, err))
+				} else {
+					logger.Success(fmt.Sprintf("Lyrics sent successfully to user %d for song %s",
+						message.Chat.ID, stateToUpdate.SongID))
 				}
+			} else {
+				logger.Error(fmt.Sprintf("Lyrics result is empty for song %s (%s)\nURL: %s",
+					stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink))
 			}
 		}()
+	} else {
+		logger.Debug(fmt.Sprintf("Song link is not from amdm.ru, skipping lyrics extraction (nameHandler)\nSong: %s\nLink: %s",
+			stateToUpdate.SongName, stateToUpdate.SongLink))
 	}
 
 	return b.SendMessageWithMarkdown(
