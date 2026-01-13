@@ -148,6 +148,7 @@ func (h *SearchHandler) messageHandler(b *bot.Bot, update tgbotapi.Update) error
 		return h.handleFieldUpdate(b, chatID, songID, field, update.Message.Text)
 	}
 
+	fmt.Printf("SEARCH DEBUG: Sending 'ничего не понятно' message to chatID=%d\n", update.Message.From.ID)
 	return b.SendMessage(update.Message.From.ID,
 		"ничего не понятно. если вы пытаетесь найти песню, сначала нажмите\n /findsong")
 }

@@ -485,8 +485,10 @@ func (h *AdminHandlers) handlePromoMessageInput(b *bot.Bot, update tgbotapi.Upda
 
 	state, exists := h.promoEditState[chatID]
 	if !exists {
-		return nil
+		return nil // Let search handler process normal messages
 	}
+
+	fmt.Printf("PROMO DEBUG: chatID=%d, editingText=%v, editingURL=%v\n", chatID, state.editingText, state.editingURL)
 
 	if state.editingText {
 		if strings.TrimSpace(text) == "" {
@@ -516,6 +518,7 @@ func (h *AdminHandlers) handlePromoMessageInput(b *bot.Bot, update tgbotapi.Upda
 		return h.sendPromoEditMessage(b, chatID, state.messageID)
 	}
 
+	fmt.Printf("PROMO DEBUG: No active editing mode, returning nil\n")
 	return nil
 }
 
