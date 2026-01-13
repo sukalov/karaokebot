@@ -272,7 +272,7 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 	rebuildUrl := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repo)
 	rebuildPayload := map[string]interface{}{
 		"event_type": "rebuild-trigger",
-		"client_payload": map[string]string{
+		"client_payload": map[string]interface{}{
 			"unit":       "rebuild triggered via bot",
 			"promo_show": value,
 		},
@@ -313,7 +313,7 @@ func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, 
 
 	payload := map[string]interface{}{
 		"event_type": eventType,
-		"client_payload": map[string]string{
+		"client_payload": map[string]interface{}{
 			"unit":  fmt.Sprintf("rebuild triggered via telegram: %s", eventType),
 			"promo": promoValue,
 		},
@@ -598,7 +598,7 @@ func (h *AdminHandlers) updatePromoVariablesAndRebuild(b *bot.Bot, chatID int64,
 	rebuildUrl := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repo)
 	rebuildPayload := map[string]interface{}{
 		"event_type": "rebuild-trigger",
-		"client_payload": map[string]string{
+		"client_payload": map[string]interface{}{
 			"unit":       "rebuild triggered via promo edit",
 			"promo_text": text,
 			"promo_url":  promoURL,
