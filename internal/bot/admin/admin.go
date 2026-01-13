@@ -488,15 +488,17 @@ func (h *AdminHandlers) handlePromoMessageInput(b *bot.Bot, update tgbotapi.Upda
 		return nil // Let search handler process normal messages
 	}
 
-	fmt.Printf("PROMO DEBUG: chatID=%d, editingText=%v, editingURL=%v\n", chatID, state.editingText, state.editingURL)
-
 	if state.editingText {
 		if strings.TrimSpace(text) == "" {
 			return b.SendMessage(chatID, "текст не может быть пустым")
 		}
 		state.currentText = strings.TrimSpace(text)
 		state.editingText = false
-		return h.sendPromoEditMessage(b, chatID, state.messageID)
+		err := h.sendPromoEditMessage(b, chatID, state.messageID)
+		if err == nil {
+			return bot.ErrMessageHandled
+		}
+		return err
 	}
 
 	if state.editingURL {
@@ -515,10 +517,13 @@ func (h *AdminHandlers) handlePromoMessageInput(b *bot.Bot, update tgbotapi.Upda
 
 		state.currentURL = strings.TrimSpace(text)
 		state.editingURL = false
-		return h.sendPromoEditMessage(b, chatID, state.messageID)
+		err := h.sendPromoEditMessage(b, chatID, state.messageID)
+		if err == nil {
+			return bot.ErrMessageHandled
+		}
+		return err
 	}
 
-	fmt.Printf("PROMO DEBUG: No active editing mode, returning nil\n")
 	return nil
 }
 

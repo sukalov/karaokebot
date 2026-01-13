@@ -2,6 +2,7 @@
 package bot
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -9,6 +10,9 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
+
+// ErrMessageHandled indicates a message was handled and processing should stop
+var ErrMessageHandled = errors.New("message handled, stop processing")
 
 // Bot represents a configurable Telegram bot
 type Bot struct {
@@ -100,6 +104,9 @@ func (b *Bot) processUpdate(
 	// Run generic message handlers
 	for _, handler := range messageHandlers {
 		if err := handler(b, update); err != nil {
+			if errors.Is(err, ErrMessageHandled) {
+				break // Stop processing if message was handled
+			}
 			log.Printf("[%s] message handler error: %v", b.name, err)
 		}
 	}
