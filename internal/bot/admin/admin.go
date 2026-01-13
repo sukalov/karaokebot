@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
@@ -16,15 +18,25 @@ import (
 	"github.com/sukalov/karaokebot/internal/state"
 )
 
+type PromoEditState struct {
+	currentText string
+	currentURL  string
+	editingText bool
+	editingURL  bool
+	messageID   int // Track the message to edit
+}
+
 type AdminHandlers struct {
 	userManager     *state.StateManager
 	admins          map[string]bool
 	clearInProgress map[string]bool
+	promoEditState  map[int64]*PromoEditState
 }
 
 func NewAdminHandlers(userManager *state.StateManager, adminUsernames []string) *AdminHandlers {
 	admins := make(map[string]bool)
 	clearInProgress := make(map[string]bool)
+	promoEditState := make(map[int64]*PromoEditState)
 	for _, username := range adminUsernames {
 		admins[username] = true
 		clearInProgress[username] = false
@@ -34,6 +46,7 @@ func NewAdminHandlers(userManager *state.StateManager, adminUsernames []string) 
 		userManager:     userManager,
 		admins:          admins,
 		clearInProgress: clearInProgress,
+		promoEditState:  promoEditState,
 	}
 }
 
@@ -139,6 +152,30 @@ func (h *AdminHandlers) ShowPromoHandler(b *bot.Bot, update tgbotapi.Update) err
 
 func (h *AdminHandlers) HidePromoHandler(b *bot.Bot, update tgbotapi.Update) error {
 	return h.updatePromoAndRebuild(b, update, "false")
+}
+
+func (h *AdminHandlers) EditPromoHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+
+	chatID := update.Message.Chat.ID
+
+	// Fetch current promo values
+	currentText, currentURL, err := h.fetchCurrentPromoValues()
+	if err != nil {
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при получении текущих значений: %v", err))
+	}
+
+	// Store editing state
+	h.promoEditState[chatID] = &PromoEditState{
+		currentText: currentText,
+		currentURL:  currentURL,
+		editingText: false,
+		editingURL:  false,
+	}
+
+	return h.sendPromoEditMessage(b, chatID, 0)
 }
 
 func (h *AdminHandlers) RebuildHandler(b *bot.Bot, update tgbotapi.Update) error {
@@ -279,6 +316,290 @@ func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, 
 	return b.SendMessage(update.Message.Chat.ID, message)
 }
 
+func (h *AdminHandlers) fetchCurrentPromoValues() (string, string, error) {
+	githubToken := os.Getenv("GITHUB_PAT_TOKEN")
+	repo := "sukalov/karaoke"
+
+	// Default values if variables don't exist
+	defaultText := "🔥 мы продаёмся 🔥"
+	defaultURL := "https://karaoke.gastroli.moscow"
+
+	// Fetch NEXT_PUBLIC_PROMO_TEXT
+	textURL := fmt.Sprintf("https://api.github.com/repos/%s/actions/variables/NEXT_PUBLIC_PROMO_TEXT", repo)
+	text, err := h.fetchGitHubVariable(textURL, githubToken)
+	if err != nil {
+		text = defaultText
+	}
+
+	// Fetch NEXT_PUBLIC_PROMO_URL
+	urlURL := fmt.Sprintf("https://api.github.com/repos/%s/actions/variables/NEXT_PUBLIC_PROMO_URL", repo)
+	promoURL, err := h.fetchGitHubVariable(urlURL, githubToken)
+	if err != nil {
+		promoURL = defaultURL
+	}
+
+	return text, promoURL, nil
+}
+
+func (h *AdminHandlers) fetchGitHubVariable(variableURL, token string) (string, error) {
+	req, err := http.NewRequest("GET", variableURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var response struct {
+		Value string `json:"value"`
+	}
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		return "", err
+	}
+
+	return response.Value, nil
+}
+
+func (h *AdminHandlers) sendPromoEditMessage(b *bot.Bot, chatID int64, messageID int) error {
+	state, exists := h.promoEditState[chatID]
+	if !exists {
+		return fmt.Errorf("editing state not found")
+	}
+
+	var message string
+	if state.editingText {
+		message = "📝 Введите новый текст для промо-кнопки:"
+	} else if state.editingURL {
+		message = "🔗 Введите новый URL для промо-кнопки:"
+	} else {
+		message = fmt.Sprintf("📝 Текущие настройки промо:\n🔤 Текст: \"%s\"\n🔗 URL: %s", state.currentText, state.currentURL)
+	}
+
+	buttons := tgbotapi.NewInlineKeyboardMarkup()
+
+	if state.editingText {
+		buttons = tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "cancel_promo_edit"),
+			),
+		)
+	} else if state.editingURL {
+		buttons = tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "cancel_promo_edit"),
+			),
+		)
+	} else {
+		buttons = tgbotapi.NewInlineKeyboardMarkup(
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("✏️ Изменить текст", "edit_promo_text"),
+				tgbotapi.NewInlineKeyboardButtonData("🔗 Изменить URL", "edit_promo_url"),
+			),
+			tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonData("✅ Подтвердить", "confirm_promo_edit"),
+			),
+		)
+	}
+
+	if messageID == 0 {
+		msg := tgbotapi.NewMessage(chatID, message)
+		msg.ReplyMarkup = buttons
+		msg.ParseMode = "Markdown"
+		msg.DisableWebPagePreview = true
+
+		sentMsg, err := b.Client.Send(msg)
+		if err != nil {
+			return err
+		}
+
+		state.messageID = sentMsg.MessageID
+	} else {
+		editMsg := tgbotapi.NewEditMessageText(chatID, messageID, message)
+		editMsg.ReplyMarkup = &buttons
+		editMsg.ParseMode = "Markdown"
+
+		_, err := b.Client.Send(editMsg)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (h *AdminHandlers) editPromoCallbackHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.CallbackQuery.From.UserName] {
+		return b.SendMessage(update.CallbackQuery.Message.Chat.ID, "вы не админ")
+	}
+
+	chatID := update.CallbackQuery.Message.Chat.ID
+	data := update.CallbackQuery.Data
+
+	state, exists := h.promoEditState[chatID]
+	if !exists {
+		return b.SendMessage(chatID, "сессия редактирования не найдена")
+	}
+
+	switch data {
+	case "edit_promo_text":
+		state.editingText = true
+		state.editingURL = false
+		return h.sendPromoEditMessage(b, chatID, state.messageID)
+
+	case "edit_promo_url":
+		state.editingText = false
+		state.editingURL = true
+		return h.sendPromoEditMessage(b, chatID, state.messageID)
+
+	case "confirm_promo_edit":
+		return h.updatePromoVariablesAndRebuild(b, chatID, state.currentText, state.currentURL)
+
+	case "cancel_promo_edit":
+		delete(h.promoEditState, chatID)
+		return b.SendMessage(chatID, "✏️ Редактирование промо отменено")
+	}
+
+	return nil
+}
+
+func (h *AdminHandlers) handlePromoMessageInput(b *bot.Bot, update tgbotapi.Update) error {
+	chatID := update.Message.Chat.ID
+	text := update.Message.Text
+
+	state, exists := h.promoEditState[chatID]
+	if !exists {
+		return nil
+	}
+
+	if state.editingText {
+		if strings.TrimSpace(text) == "" {
+			return b.SendMessage(chatID, "❌ Текст не может быть пустым")
+		}
+		state.currentText = strings.TrimSpace(text)
+		state.editingText = false
+		return h.sendPromoEditMessage(b, chatID, state.messageID)
+	}
+
+	if state.editingURL {
+		if strings.TrimSpace(text) == "" {
+			return b.SendMessage(chatID, "❌ URL не может быть пустым")
+		}
+
+		// Basic URL validation
+		if !strings.HasPrefix(text, "http://") && !strings.HasPrefix(text, "https://") {
+			return b.SendMessage(chatID, "❌ URL должен начинаться с http:// или https://")
+		}
+
+		if _, err := url.Parse(text); err != nil {
+			return b.SendMessage(chatID, "❌ Неверный формат URL")
+		}
+
+		state.currentURL = strings.TrimSpace(text)
+		state.editingURL = false
+		return h.sendPromoEditMessage(b, chatID, state.messageID)
+	}
+
+	return nil
+}
+
+func (h *AdminHandlers) updatePromoVariablesAndRebuild(b *bot.Bot, chatID int64, text, promoURL string) error {
+	githubToken := os.Getenv("GITHUB_PAT_TOKEN")
+	repo := "sukalov/karaoke"
+
+	// Update NEXT_PUBLIC_PROMO_TEXT
+	if err := h.updateGitHubVariable(repo, githubToken, "NEXT_PUBLIC_PROMO_TEXT", text); err != nil {
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при обновлении текста: %v", err))
+	}
+
+	// Update NEXT_PUBLIC_PROMO_URL
+	if err := h.updateGitHubVariable(repo, githubToken, "NEXT_PUBLIC_PROMO_URL", promoURL); err != nil {
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при обновлении URL: %v", err))
+	}
+
+	// Trigger rebuild
+	rebuildUrl := fmt.Sprintf("https://api.github.com/repos/%s/dispatches", repo)
+	rebuildPayload := map[string]interface{}{
+		"event_type":     "rebuild-trigger",
+		"client_payload": map[string]string{"unit": "rebuild triggered via promo edit"},
+	}
+	jsonRebuild, err := json.Marshal(rebuildPayload)
+	if err != nil {
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при подготовке rebuild payload: %v", err))
+	}
+
+	req, err := http.NewRequest("POST", rebuildUrl, bytes.NewBuffer(jsonRebuild))
+	if err != nil {
+		return b.SendMessage(chatID, fmt.Sprintf("ошибка при создании rebuild запроса: %v", err))
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("Authorization", fmt.Sprintf("token %s", githubToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return b.SendMessage(chatID, "ошибка при запуске пересборки")
+	}
+	defer resp.Body.Close()
+
+	// Clean up state
+	delete(h.promoEditState, chatID)
+
+	confirmation := fmt.Sprintf("✅ Промо обновлено!\n🔤 Текст: \"%s\"\n🔗 URL: %s\n\n🔄 Запущен процесс пересборки сайта", text, promoURL)
+	return b.SendMessage(chatID, confirmation)
+}
+
+func (h *AdminHandlers) updateGitHubVariable(repo, token, name, value string) error {
+	apiUrl := fmt.Sprintf("https://api.github.com/repos/%s/actions/variables/%s", repo, name)
+	payload := map[string]string{"name": name, "value": value}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PATCH", apiUrl, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil || (resp.StatusCode != 204 && resp.StatusCode != 200) {
+		// If PATCH fails, it might not exist yet, try POST
+		apiUrl = fmt.Sprintf("https://api.github.com/repos/%s/actions/variables", repo)
+		req, _ = http.NewRequest("POST", apiUrl, bytes.NewBuffer(jsonPayload))
+		req.Header.Set("Authorization", fmt.Sprintf("token %s", token))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err = client.Do(req)
+	}
+
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	return nil
+}
+
 func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUsernames []string) {
 	// Create handlers
 	handlers := NewAdminHandlers(userManager, adminUsernames)
@@ -295,6 +616,7 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["rebuild"] = handlers.RebuildHandler
 	commandHandlers["show_promo"] = handlers.ShowPromoHandler
 	commandHandlers["hide_promo"] = handlers.HidePromoHandler
+	commandHandlers["edit_promo"] = handlers.EditPromoHandler
 	commandHandlers["findsong"] = searchHandlers.findSongHandler
 	commandHandlers["cancel"] = searchHandlers.cancelAction
 	commandHandlers["open"] = handlers.openLineHandler
@@ -304,7 +626,7 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["limit"] = handlers.limitHandler
 
 	// Add message handler
-	messageHandlers = append(messageHandlers, searchHandlers.messageHandler)
+	messageHandlers = append(messageHandlers, searchHandlers.messageHandler, handlers.handlePromoMessageInput)
 
 	// Add callback handlers for all possible prefixes
 	callbackHandlers["edit_song"] = searchHandlers.callbackHandler
@@ -315,6 +637,10 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	callbackHandlers["confirm_clear_line"] = handlers.confirmHandler
 	callbackHandlers["enable_limit"] = handlers.enableLimitHandler
 	callbackHandlers["disable_limit"] = handlers.disableLimitHandler
+	callbackHandlers["edit_promo_text"] = handlers.editPromoCallbackHandler
+	callbackHandlers["edit_promo_url"] = handlers.editPromoCallbackHandler
+	callbackHandlers["confirm_promo_edit"] = handlers.editPromoCallbackHandler
+	callbackHandlers["cancel_promo_edit"] = handlers.editPromoCallbackHandler
 
 	// Start the bot
 	go adminBot.Start(commandHandlers, messageHandlers, callbackHandlers)
