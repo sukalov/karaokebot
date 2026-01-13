@@ -385,11 +385,11 @@ func (h *AdminHandlers) sendPromoEditMessage(b *bot.Bot, chatID int64, messageID
 
 	var message string
 	if state.editingText {
-		message = "📝 Введите новый текст для промо-кнопки:"
+		message = "введите новый текст для промо-кнопки:"
 	} else if state.editingURL {
-		message = "🔗 Введите новый URL для промо-кнопки:"
+		message = "введите новый URL для промо-кнопки:"
 	} else {
-		message = fmt.Sprintf("📝 Текущие настройки промо:\n🔤 Текст: \"%s\"\n🔗 URL: %s", state.currentText, state.currentURL)
+		message = fmt.Sprintf("текущие настройки промо:\nтекст: \"%s\"\nURL: %s", state.currentText, state.currentURL)
 	}
 
 	buttons := tgbotapi.NewInlineKeyboardMarkup()
@@ -397,23 +397,23 @@ func (h *AdminHandlers) sendPromoEditMessage(b *bot.Bot, chatID int64, messageID
 	if state.editingText {
 		buttons = tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "cancel_promo_edit"),
+				tgbotapi.NewInlineKeyboardButtonData("❌ отмена", "cancel_promo_edit"),
 			),
 		)
 	} else if state.editingURL {
 		buttons = tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("❌ Отмена", "cancel_promo_edit"),
+				tgbotapi.NewInlineKeyboardButtonData("❌ отмена", "cancel_promo_edit"),
 			),
 		)
 	} else {
 		buttons = tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("✏️ Изменить текст", "edit_promo_text"),
-				tgbotapi.NewInlineKeyboardButtonData("🔗 Изменить URL", "edit_promo_url"),
+				tgbotapi.NewInlineKeyboardButtonData("✏️ изменить текст", "edit_promo_text"),
+				tgbotapi.NewInlineKeyboardButtonData("🔗 изменить URL", "edit_promo_url"),
 			),
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("✅ Подтвердить", "confirm_promo_edit"),
+				tgbotapi.NewInlineKeyboardButtonData("✅ подтвердить", "confirm_promo_edit"),
 			),
 		)
 	}
@@ -473,7 +473,7 @@ func (h *AdminHandlers) editPromoCallbackHandler(b *bot.Bot, update tgbotapi.Upd
 
 	case "cancel_promo_edit":
 		delete(h.promoEditState, chatID)
-		return b.SendMessage(chatID, "✏️ Редактирование промо отменено")
+		return b.SendMessage(chatID, "редактирование промо отменено")
 	}
 
 	return nil
@@ -490,7 +490,7 @@ func (h *AdminHandlers) handlePromoMessageInput(b *bot.Bot, update tgbotapi.Upda
 
 	if state.editingText {
 		if strings.TrimSpace(text) == "" {
-			return b.SendMessage(chatID, "❌ Текст не может быть пустым")
+			return b.SendMessage(chatID, "текст не может быть пустым")
 		}
 		state.currentText = strings.TrimSpace(text)
 		state.editingText = false
@@ -499,16 +499,16 @@ func (h *AdminHandlers) handlePromoMessageInput(b *bot.Bot, update tgbotapi.Upda
 
 	if state.editingURL {
 		if strings.TrimSpace(text) == "" {
-			return b.SendMessage(chatID, "❌ URL не может быть пустым")
+			return b.SendMessage(chatID, "URL не может быть пустым")
 		}
 
 		// Basic URL validation
 		if !strings.HasPrefix(text, "http://") && !strings.HasPrefix(text, "https://") {
-			return b.SendMessage(chatID, "❌ URL должен начинаться с http:// или https://")
+			return b.SendMessage(chatID, "URL должен начинаться с http:// или https://")
 		}
 
 		if _, err := url.Parse(text); err != nil {
-			return b.SendMessage(chatID, "❌ Неверный формат URL")
+			return b.SendMessage(chatID, "неверный формат URL")
 		}
 
 		state.currentURL = strings.TrimSpace(text)
@@ -562,7 +562,7 @@ func (h *AdminHandlers) updatePromoVariablesAndRebuild(b *bot.Bot, chatID int64,
 	// Clean up state
 	delete(h.promoEditState, chatID)
 
-	confirmation := fmt.Sprintf("✅ Промо обновлено!\n🔤 Текст: \"%s\"\n🔗 URL: %s\n\n🔄 Запущен процесс пересборки сайта", text, promoURL)
+	confirmation := fmt.Sprintf("промо обновлено!\nтекст: \"%s\"\nURL: %s\n\nзапущен процесс пересборки сайта", text, promoURL)
 	return b.SendMessage(chatID, confirmation)
 }
 
@@ -626,7 +626,7 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["limit"] = handlers.limitHandler
 
 	// Add message handler
-	messageHandlers = append(messageHandlers, searchHandlers.messageHandler, handlers.handlePromoMessageInput)
+	messageHandlers = append(messageHandlers, handlers.handlePromoMessageInput, searchHandlers.messageHandler)
 
 	// Add callback handlers for all possible prefixes
 	callbackHandlers["edit_song"] = searchHandlers.callbackHandler
