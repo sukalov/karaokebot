@@ -39,7 +39,7 @@ func main() {
 		log.Fatalf("failed to create client bot: %v", err)
 	}
 
-	logger.Init(clientBot)
+	logger.Init(adminBot)
 
 	// Setup and start admin bot handlers
 	admin.SetupHandlers(adminBot, userManager, adminUsernames)
