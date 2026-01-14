@@ -52,7 +52,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			return b.SendMessage(message.Chat.ID, "извините, песни с таким id нет")
 		}
 
-		logger.Info(fmt.Sprintf("🎵📋 User %s (%d) started interaction with song %s", message.From.UserName, message.Chat.ID, songID))
+		logger.Info(fmt.Sprintf("🎵 User %s (%d) started interaction with song %s", message.From.UserName, message.Chat.ID, songID))
 
 		// Check if user exists in database
 		user, err := db.Users.GetByChatID(message.Chat.ID)
@@ -211,7 +211,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 		logger.Error(fmt.Sprintf("🎵🔴 Error syncing user state\nChat ID: %d\nError: %v", message.Chat.ID, err))
 	}
 
-	logger.Success(fmt.Sprintf("🎵✅ User %s (%d) added to line with song %s", user.SavedName.String, message.Chat.ID, stateToUpdate.SongName))
+	logger.Info(fmt.Sprintf("🎵 User %s (%d) added to line with song %s", user.SavedName.String, message.Chat.ID, stateToUpdate.SongName))
 
 	// Fetch lyrics if it's an AmDm.ru URL
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
@@ -288,7 +288,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 		logger.Error(fmt.Sprintf("🎵🔴 Failed to update saved name\nChat ID: %d\nName: %s\nError: %v", stateToUpdate.ChatID, stateToUpdate.TypedName, err))
 	}
 
-	logger.Success(fmt.Sprintf("🎵✅ User %s (%d) added to line with song %s", stateToUpdate.TypedName, message.Chat.ID, stateToUpdate.SongName))
+	logger.Info(fmt.Sprintf("🎵 User %s (%d) added to line with song %s", stateToUpdate.TypedName, message.Chat.ID, stateToUpdate.SongName))
 
 	// Fetch lyrics if it's an AmDm.ru URL
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {

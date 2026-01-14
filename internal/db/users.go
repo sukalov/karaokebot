@@ -93,7 +93,7 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 			return fmt.Errorf("failed to insert new user: %w", err)
 		}
 
-		logger.Info(fmt.Sprintf("🎵📋 New user registered\nChat ID: %d\nUsername: %s\nName: %s",
+		logger.Info(fmt.Sprintf("🎵 New user registered\nChat ID: %d\nUsername: %s\nName: %s",
 			message.Chat.ID,
 			userName.String,
 			tgName.String,

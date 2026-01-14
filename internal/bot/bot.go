@@ -54,7 +54,7 @@ func (b *Bot) Start(
 	if strings.Contains(b.name, "admin") {
 		botIndicator = "⚙️"
 	}
-	logger.Info(fmt.Sprintf("%s [%s] authorized on account %s", botIndicator, b.name, b.Client.Self.UserName))
+	logger.Info(fmt.Sprintf("%s %s authorized on account %s", botIndicator, b.name, b.Client.Self.UserName))
 
 	for {
 		select {

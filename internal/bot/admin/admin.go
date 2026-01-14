@@ -62,7 +62,7 @@ func (h *AdminHandlers) clearLineHandler(b *bot.Bot, update tgbotapi.Update) err
 		return b.SendMessage(message.Chat.ID, "вы не админ")
 	}
 	h.clearInProgress[update.Message.From.UserName] = true
-	logger.Info(fmt.Sprintf("⚙️📋 Admin %s initiated clear line", message.From.UserName))
+	logger.Info(fmt.Sprintf("⚙️ Admin %s initiated clear line", message.From.UserName))
 	return b.SendMessageWithButtons(message.Chat.ID, "весь список будет безвозвратно удалён! уверены?",
 		tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
@@ -109,7 +109,7 @@ func (h *AdminHandlers) testLyricsHandler(b *bot.Bot, update tgbotapi.Update) er
 	}
 
 	url := strings.TrimSpace(args)
-	logger.Info(fmt.Sprintf("⚙️📋 Admin %s requested lyrics test", message.From.UserName))
+	logger.Info(fmt.Sprintf("⚙️ Admin %s requested lyrics test", message.From.UserName))
 
 	if !strings.Contains(url, "amdm.ru") {
 		return b.SendMessage(message.Chat.ID, "поддерживаются только ссылки с amdm.ru")
@@ -123,7 +123,7 @@ func (h *AdminHandlers) testLyricsHandler(b *bot.Bot, update tgbotapi.Update) er
 		return b.SendMessage(message.Chat.ID, fmt.Sprintf("ошибка при извлечении слов: %v", err))
 	}
 
-	logger.Success(fmt.Sprintf("⚙️✅ Lyrics test succeeded for admin %s\nLength: %d chars", message.From.UserName, len(result.Text)))
+	logger.Info(fmt.Sprintf("⚙️ Lyrics test succeeded for admin %s\nLength: %d chars", message.From.UserName, len(result.Text)))
 
 	if len(result.Text) > 3000 {
 		truncated := result.Text[:3000] + "\n\n... (обрезано, текст слишком длинный)"
@@ -138,7 +138,7 @@ func (h *AdminHandlers) confirmHandler(b *bot.Bot, update tgbotapi.Update) error
 	if h.clearInProgress[update.CallbackQuery.From.UserName] {
 		h.userManager.Clear(ctx)
 		h.clearInProgress[update.CallbackQuery.From.UserName] = false
-		logger.Success(fmt.Sprintf("⚙️✅ Admin %s cleared the line", update.CallbackQuery.From.UserName))
+		logger.Info(fmt.Sprintf("⚙️ Admin %s cleared the line", update.CallbackQuery.From.UserName))
 		return b.SendMessage(update.CallbackQuery.From.ID, "список очищен")
 	}
 	return b.SendMessage(update.CallbackQuery.From.ID, "кнопка уже не работает")
@@ -160,7 +160,7 @@ func (h *AdminHandlers) openLineHandler(b *bot.Bot, update tgbotapi.Update) erro
 	if err := h.userManager.OpenList(ctx); err != nil {
 		return b.SendMessage(update.Message.From.ID, "случилась ошибка")
 	}
-	logger.Success(fmt.Sprintf("⚙️✅ Admin %s opened line", update.Message.From.UserName))
+	logger.Info(fmt.Sprintf("⚙️ Admin %s opened line", update.Message.From.UserName))
 	return b.SendMessage(update.Message.From.ID, "список открыт для записи")
 }
 
@@ -172,7 +172,7 @@ func (h *AdminHandlers) closeLineHandler(b *bot.Bot, update tgbotapi.Update) err
 	if err := h.userManager.CloseList(ctx); err != nil {
 		return b.SendMessage(update.Message.From.ID, "случилась ошибка")
 	}
-	logger.Success(fmt.Sprintf("⚙️✅ Admin %s closed line", update.Message.From.UserName))
+	logger.Info(fmt.Sprintf("⚙️ Admin %s closed line", update.Message.From.UserName))
 	return b.SendMessage(update.Message.From.ID, "запись закрыта")
 }
 
@@ -182,7 +182,7 @@ func (h *AdminHandlers) enableLimitHandler(b *bot.Bot, update tgbotapi.Update) e
 	}
 	ctx := context.Background()
 	h.userManager.SetLimit(ctx, 3)
-	logger.Success(fmt.Sprintf("⚙️✅ Admin %s enabled limit (3 songs)", update.CallbackQuery.From.UserName))
+	logger.Info(fmt.Sprintf("⚙️ Admin %s enabled limit (3 songs)", update.CallbackQuery.From.UserName))
 	return b.SendMessage(update.CallbackQuery.From.ID, "лимит ON. теперь каждый поёт не больше трёх раз")
 }
 
@@ -192,7 +192,7 @@ func (h *AdminHandlers) disableLimitHandler(b *bot.Bot, update tgbotapi.Update) 
 	}
 	ctx := context.Background()
 	h.userManager.SetLimit(ctx, 1000)
-	logger.Success(fmt.Sprintf("⚙️✅ Admin %s disabled limit", update.CallbackQuery.From.UserName))
+	logger.Info(fmt.Sprintf("⚙️ Admin %s disabled limit", update.CallbackQuery.From.UserName))
 	return b.SendMessage(update.CallbackQuery.From.ID, "лимит OFF. все поют сколько угодно")
 }
 
@@ -371,7 +371,7 @@ func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, 
 	switch eventType {
 	case "rebuild-trigger":
 		message = "запущен процесс пересборки сайта"
-		logMessage = fmt.Sprintf("⚙️✅ [SUCCESS] Admin %s triggered rebuild", update.Message.From.UserName)
+		logMessage = fmt.Sprintf("⚙️ Admin %s triggered rebuild", update.Message.From.UserName)
 	case "show-promo":
 		message = "промо-кнопка показана"
 	case "hide-promo":

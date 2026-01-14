@@ -60,7 +60,7 @@ func sendLog(prefix, message string) {
 		return
 	}
 
-	logMessage := fmt.Sprintf("%s\n%s", prefix, message)
+	logMessage := fmt.Sprintf("%s %s", prefix, message)
 
 	go func() {
 		if err := botClient.SendMessage(ChannelID, logMessage); err != nil {
