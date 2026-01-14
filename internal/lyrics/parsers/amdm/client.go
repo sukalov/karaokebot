@@ -41,7 +41,7 @@ func (c *Client) FetchPage(url string) (string, error) {
 	fetchURL := strings.Replace(url, "123.amdm.ru", "amdm.ru", 1)
 	req, err := http.NewRequest("GET", fetchURL, nil)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to create HTTP request\nURL: %s\nError: %v", fetchURL, err))
+		logger.Error(false, fmt.Sprintf("Failed to create HTTP request\nURL: %s\nError: %v", fetchURL, err))
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
@@ -54,13 +54,13 @@ func (c *Client) FetchPage(url string) (string, error) {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to fetch page\nURL: %s\nError: %v", fetchURL, err))
+		logger.Error(false, fmt.Sprintf("Failed to fetch page\nURL: %s\nError: %v", fetchURL, err))
 		return "", fmt.Errorf("failed to fetch page: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		logger.Error(fmt.Sprintf("HTTP error fetching page\nURL: %s\nStatus: %d", fetchURL, resp.StatusCode))
+		logger.Error(false, fmt.Sprintf("HTTP error fetching page\nURL: %s\nStatus: %d", fetchURL, resp.StatusCode))
 		return "", fmt.Errorf("HTTP error! status: %d", resp.StatusCode)
 	}
 
@@ -70,7 +70,7 @@ func (c *Client) FetchPage(url string) (string, error) {
 	if strings.Contains(resp.Header.Get("Content-Encoding"), "gzip") {
 		gzipReader, err := gzip.NewReader(resp.Body)
 		if err != nil {
-			logger.Error(fmt.Sprintf("Failed to create gzip reader\nURL: %s\nError: %v", fetchURL, err))
+			logger.Error(false, fmt.Sprintf("Failed to create gzip reader\nURL: %s\nError: %v", fetchURL, err))
 			return "", fmt.Errorf("failed to create gzip reader: %w", err)
 		}
 		defer gzipReader.Close()
@@ -79,7 +79,7 @@ func (c *Client) FetchPage(url string) (string, error) {
 
 	body, err := io.ReadAll(reader)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Failed to read response body\nURL: %s\nError: %v", fetchURL, err))
+		logger.Error(false, fmt.Sprintf("Failed to read response body\nURL: %s\nError: %v", fetchURL, err))
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 

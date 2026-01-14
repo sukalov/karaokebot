@@ -38,7 +38,7 @@ func (s *Service) ExtractLyrics(url string) (*LyricsResult, error) {
 	}
 
 	// Add other parsers here as needed
-	logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Unsupported URL source: %s", url))
+	logger.Error(false, fmt.Sprintf(" Unsupported URL source: %s", url))
 	return nil, fmt.Errorf("unsupported URL source: %s", url)
 }
 
@@ -47,7 +47,7 @@ func (s *Service) extractFromAmdm(url string) (*LyricsResult, error) {
 
 	result, err := s.amdmParser.ExtractLyricsFromAmdm(url)
 	if err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to extract lyrics\nError: %v", err))
+		logger.Error(false, fmt.Sprintf(" Failed to extract lyrics\nError: %v", err))
 		return nil, err
 	}
 

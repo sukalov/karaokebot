@@ -29,7 +29,7 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Query timeout after 5 seconds\nChat ID: %d", update.Message.Chat.ID))
+			logger.Error(false, fmt.Sprintf(" Query timeout after 5 seconds\nChat ID: %d", update.Message.Chat.ID))
 		}
 	}()
 
@@ -53,11 +53,11 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 	defer func() {
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error rolling back transaction\nChat ID: %d\nError: %v", message.Chat.ID, rollbackErr))
+				logger.Error(false, fmt.Sprintf(" Error rolling back transaction\nChat ID: %d\nError: %v", message.Chat.ID, rollbackErr))
 			}
 		} else {
 			if commitErr := tx.Commit(); commitErr != nil {
-				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error committing transaction\nChat ID: %d\nError: %v", message.Chat.ID, commitErr))
+				logger.Error(false, fmt.Sprintf(" Error committing transaction\nChat ID: %d\nError: %v", message.Chat.ID, commitErr))
 			}
 		}
 	}()
@@ -93,7 +93,7 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 			return fmt.Errorf("failed to insert new user: %w", err)
 		}
 
-		logger.Info(fmt.Sprintf("🎵📋 [INFO] New user registered\nChat ID: %d\nUsername: %s\nName: %s",
+		logger.Info(false, fmt.Sprintf(" New user registered\nChat ID: %d\nUsername: %s\nName: %s",
 			message.Chat.ID,
 			userName.String,
 			tgName.String,
@@ -108,7 +108,7 @@ func (u *UsersType) GetByChatID(chatID int64) (User, error) {
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Query timeout after 5 seconds\nChat ID: %d", chatID))
+			logger.Error(false, fmt.Sprintf(" Query timeout after 5 seconds\nChat ID: %d", chatID))
 		}
 	}()
 
@@ -140,7 +140,7 @@ func (u *UsersType) UpdateSavedName(chatID int64, newName string) error {
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Query timeout after 5 seconds\nChat ID: %d", chatID))
+			logger.Error(false, fmt.Sprintf(" Query timeout after 5 seconds\nChat ID: %d", chatID))
 		}
 	}()
 

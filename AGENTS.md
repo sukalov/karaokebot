@@ -64,11 +64,13 @@ This guide helps agentic coding agents work effectively in the karaokebot reposi
 - In handlers, return error to be handled by caller
 
 ### Logging
-- Use `logger.Info()` for informational messages
-- Use `logger.Error()` for errors
-- Use `logger.Debug()` for debugging information
-- Use `logger.Success()` for successful operations
-- Use `logger.LogWithErr(msg, err)` when error may be nil
+- Use `logger.Info(isAdmin, message)` for informational messages
+- Use `logger.Error(isAdmin, message)` for errors
+- Use `logger.Debug(isAdmin, message)` for debugging information
+- Use `logger.Success(isAdmin, message)` for successful operations
+- First parameter: `true` for admin logs, `false` for client logs
+- All emojis are handled by logger - DO NOT include emojis in log messages
+- Log format: `🎵 ℹ️ INFO Message` or `⚙️ ❌ ERROR Message`
 
 ### Handlers
 - Handler signature: `func(b *bot.Bot, update tgbotapi.Update) error`
