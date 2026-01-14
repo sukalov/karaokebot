@@ -36,7 +36,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 	err := db.Users.Register(update)
 
 	if err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error registering user\nChat ID: %d\nUsername: %s\nError: %v", message.Chat.ID, message.From.UserName, err))
+		logger.Error(fmt.Sprintf("🎵🔴 Error registering user\nChat ID: %d\nUsername: %s\nError: %v", message.Chat.ID, message.From.UserName, err))
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при регистрации")
 	}
 
@@ -52,12 +52,12 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 			return b.SendMessage(message.Chat.ID, "извините, песни с таким id нет")
 		}
 
-		logger.Info(fmt.Sprintf("🎵📋 [INFO] User %s (%d) started interaction with song %s", message.From.UserName, message.Chat.ID, songID))
+		logger.Info(fmt.Sprintf("🎵📋 User %s (%d) started interaction with song %s", message.From.UserName, message.Chat.ID, songID))
 
 		// Check if user exists in database
 		user, err := db.Users.GetByChatID(message.Chat.ID)
 		if err != nil {
-			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error fetching user\nChat ID: %d\nError: %v", message.Chat.ID, err))
+			logger.Error(fmt.Sprintf("🎵🔴 Error fetching user\nChat ID: %d\nError: %v", message.Chat.ID, err))
 			return b.SendMessage(message.Chat.ID, "произошла ошибка при поиске пользователя")
 		}
 
@@ -156,7 +156,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	// Answer callback immediately
 	callback := tgbotapi.NewCallback(query.ID, "")
 	if _, err := b.Client.Request(callback); err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to answer callback query\nQuery ID: %s\nError: %v", query.ID, err))
+		logger.Error(fmt.Sprintf("🎵🔴 Failed to answer callback query\nQuery ID: %s\nError: %v", query.ID, err))
 		return err
 	}
 
@@ -181,7 +181,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	if !h.userManager.IsOpen() {
 		ctx := context.Background()
 		if err := h.userManager.RemoveState(ctx, stateToUpdate.ID); err != nil {
-			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error cleaning up user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
+			logger.Error(fmt.Sprintf("🎵🔴 Error cleaning up user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
 			return b.SendMessage(message.Chat.ID, "УВЫ!")
 		}
 		return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта.\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
@@ -190,12 +190,12 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	// Use context with timeout for database operations
 	user, err := db.Users.GetByChatID(message.Chat.ID)
 	if err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error getting user by chat ID\nChat ID: %d\nError: %v", message.Chat.ID, err))
+		logger.Error(fmt.Sprintf("🎵🔴 Error getting user by chat ID\nChat ID: %d\nError: %v", message.Chat.ID, err))
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при получении сохраненного имени")
 	}
 
 	if !user.SavedName.Valid {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] User saved name not found\nChat ID: %d", message.Chat.ID))
+		logger.Error(fmt.Sprintf("🎵🔴 User saved name not found\nChat ID: %d", message.Chat.ID))
 		return fmt.Errorf("user saved name not found")
 	}
 
@@ -204,32 +204,32 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	stateToUpdate.TimeAdded = time.Now()
 
 	if err := h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate); err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error editing user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
+		logger.Error(fmt.Sprintf("🎵🔴 Error editing user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
 	}
 
 	if err := h.userManager.Sync(ctx); err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error syncing user state\nChat ID: %d\nError: %v", message.Chat.ID, err))
+		logger.Error(fmt.Sprintf("🎵🔴 Error syncing user state\nChat ID: %d\nError: %v", message.Chat.ID, err))
 	}
 
-	logger.Success(fmt.Sprintf("🎵✅ [SUCCESS] User %s (%d) added to line with song %s", user.SavedName.String, message.Chat.ID, stateToUpdate.SongName))
+	logger.Success(fmt.Sprintf("🎵✅ User %s (%d) added to line with song %s", user.SavedName.String, message.Chat.ID, stateToUpdate.SongName))
 
 	// Fetch lyrics if it's an AmDm.ru URL
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
 		go func() {
 			lyricsResult, err := h.lyricsService.ExtractLyrics(stateToUpdate.SongLink)
 			if err != nil {
-				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to fetch lyrics for song %s (%s)\nURL: %s\nUser: %s (%d)\nError: %v",
+				logger.Error(fmt.Sprintf("🎵🔴 Failed to fetch lyrics for song %s (%s)\nURL: %s\nUser: %s (%d)\nError: %v",
 					stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink, user.SavedName.String, message.Chat.ID, err))
 				return
 			}
 
 			if lyricsResult.Text != "" {
 				if err := b.SendMessageWithMarkdown(message.Chat.ID, lyricsResult.Text, false); err != nil {
-					logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to send lyrics to user %d for song %s\nError: %v",
+					logger.Error(fmt.Sprintf("🎵🔴 Failed to send lyrics to user %d for song %s\nError: %v",
 						message.Chat.ID, stateToUpdate.SongID, err))
 				}
 			} else {
-				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Lyrics result is empty for song %s (%s)\nURL: %s",
+				logger.Error(fmt.Sprintf("🎵🔴 Lyrics result is empty for song %s (%s)\nURL: %s",
 					stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink))
 			}
 		}()
@@ -263,7 +263,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	if !h.userManager.IsOpen() {
 		ctx := context.Background()
 		if err := h.userManager.RemoveState(ctx, stateToUpdate.ID); err != nil {
-			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error cleaning up user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
+			logger.Error(fmt.Sprintf("🎵🔴 Error cleaning up user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
 			return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта. (простите, мы понимаем, вы были уже так близко)\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
 		}
 		return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта. (простите, мы понимаем, вы были уже так близко)\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
@@ -279,34 +279,34 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate)
 	h.userManager.Sync(ctx)
 	if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to increment times performed\nChat ID: %d\nError: %v", stateToUpdate.ChatID, err))
+		logger.Error(fmt.Sprintf("🎵🔴 Failed to increment times performed\nChat ID: %d\nError: %v", stateToUpdate.ChatID, err))
 	}
 	if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to increment song counter\nSong ID: %s\nChat ID: %d\nError: %v", stateToUpdate.SongID, stateToUpdate.ChatID, err))
+		logger.Error(fmt.Sprintf("🎵🔴 Failed to increment song counter\nSong ID: %s\nChat ID: %d\nError: %v", stateToUpdate.SongID, stateToUpdate.ChatID, err))
 	}
 	if err := db.Users.UpdateSavedName(stateToUpdate.ChatID, stateToUpdate.TypedName); err != nil {
-		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to update saved name\nChat ID: %d\nName: %s\nError: %v", stateToUpdate.ChatID, stateToUpdate.TypedName, err))
+		logger.Error(fmt.Sprintf("🎵🔴 Failed to update saved name\nChat ID: %d\nName: %s\nError: %v", stateToUpdate.ChatID, stateToUpdate.TypedName, err))
 	}
 
-	logger.Success(fmt.Sprintf("🎵✅ [SUCCESS] User %s (%d) added to line with song %s", stateToUpdate.TypedName, message.Chat.ID, stateToUpdate.SongName))
+	logger.Success(fmt.Sprintf("🎵✅ User %s (%d) added to line with song %s", stateToUpdate.TypedName, message.Chat.ID, stateToUpdate.SongName))
 
 	// Fetch lyrics if it's an AmDm.ru URL
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
 		go func() {
 			lyricsResult, err := h.lyricsService.ExtractLyrics(stateToUpdate.SongLink)
 			if err != nil {
-				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to fetch lyrics for song %s (%s)\nURL: %s\nUser: %s (%d)\nError: %v",
+				logger.Error(fmt.Sprintf("🎵🔴 Failed to fetch lyrics for song %s (%s)\nURL: %s\nUser: %s (%d)\nError: %v",
 					stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink, stateToUpdate.TypedName, message.Chat.ID, err))
 				return
 			}
 
 			if lyricsResult.Text != "" {
 				if err := b.SendMessageWithMarkdown(message.Chat.ID, lyricsResult.Text, false); err != nil {
-					logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Failed to send lyrics to user %d for song %s\nError: %v",
+					logger.Error(fmt.Sprintf("🎵🔴 Failed to send lyrics to user %d for song %s\nError: %v",
 						message.Chat.ID, stateToUpdate.SongID, err))
 				}
 			} else {
-				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Lyrics result is empty for song %s (%s)\nURL: %s",
+				logger.Error(fmt.Sprintf("🎵🔴 Lyrics result is empty for song %s (%s)\nURL: %s",
 					stateToUpdate.SongID, stateToUpdate.SongName, stateToUpdate.SongLink))
 			}
 		}()

@@ -62,7 +62,7 @@ func (h *AdminHandlers) clearLineHandler(b *bot.Bot, update tgbotapi.Update) err
 		return b.SendMessage(message.Chat.ID, "вы не админ")
 	}
 	h.clearInProgress[update.Message.From.UserName] = true
-	logger.Info(fmt.Sprintf("⚙️📋 [INFO] Admin %s initiated clear line", message.From.UserName))
+	logger.Info(fmt.Sprintf("⚙️📋 Admin %s initiated clear line", message.From.UserName))
 	return b.SendMessageWithButtons(message.Chat.ID, "весь список будет безвозвратно удалён! уверены?",
 		tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
@@ -109,7 +109,7 @@ func (h *AdminHandlers) testLyricsHandler(b *bot.Bot, update tgbotapi.Update) er
 	}
 
 	url := strings.TrimSpace(args)
-	logger.Info(fmt.Sprintf("⚙️📋 [INFO] Admin %s requested lyrics test", message.From.UserName))
+	logger.Info(fmt.Sprintf("⚙️📋 Admin %s requested lyrics test", message.From.UserName))
 
 	if !strings.Contains(url, "amdm.ru") {
 		return b.SendMessage(message.Chat.ID, "поддерживаются только ссылки с amdm.ru")
@@ -119,11 +119,11 @@ func (h *AdminHandlers) testLyricsHandler(b *bot.Bot, update tgbotapi.Update) er
 
 	result, err := h.lyricsService.ExtractLyrics(url)
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to extract lyrics for test\nAdmin: %s\nError: %v", message.From.UserName, err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to extract lyrics for test\nAdmin: %s\nError: %v", message.From.UserName, err))
 		return b.SendMessage(message.Chat.ID, fmt.Sprintf("ошибка при извлечении слов: %v", err))
 	}
 
-	logger.Success(fmt.Sprintf("⚙️✅ [SUCCESS] Lyrics test succeeded for admin %s\nLength: %d chars", message.From.UserName, len(result.Text)))
+	logger.Success(fmt.Sprintf("⚙️✅ Lyrics test succeeded for admin %s\nLength: %d chars", message.From.UserName, len(result.Text)))
 
 	if len(result.Text) > 3000 {
 		truncated := result.Text[:3000] + "\n\n... (обрезано, текст слишком длинный)"
@@ -138,7 +138,7 @@ func (h *AdminHandlers) confirmHandler(b *bot.Bot, update tgbotapi.Update) error
 	if h.clearInProgress[update.CallbackQuery.From.UserName] {
 		h.userManager.Clear(ctx)
 		h.clearInProgress[update.CallbackQuery.From.UserName] = false
-		logger.Success(fmt.Sprintf("⚙️✅ [SUCCESS] Admin %s cleared the line", update.CallbackQuery.From.UserName))
+		logger.Success(fmt.Sprintf("⚙️✅ Admin %s cleared the line", update.CallbackQuery.From.UserName))
 		return b.SendMessage(update.CallbackQuery.From.ID, "список очищен")
 	}
 	return b.SendMessage(update.CallbackQuery.From.ID, "кнопка уже не работает")
@@ -160,7 +160,7 @@ func (h *AdminHandlers) openLineHandler(b *bot.Bot, update tgbotapi.Update) erro
 	if err := h.userManager.OpenList(ctx); err != nil {
 		return b.SendMessage(update.Message.From.ID, "случилась ошибка")
 	}
-	logger.Success(fmt.Sprintf("⚙️✅ [SUCCESS] Admin %s opened line", update.Message.From.UserName))
+	logger.Success(fmt.Sprintf("⚙️✅ Admin %s opened line", update.Message.From.UserName))
 	return b.SendMessage(update.Message.From.ID, "список открыт для записи")
 }
 
@@ -172,7 +172,7 @@ func (h *AdminHandlers) closeLineHandler(b *bot.Bot, update tgbotapi.Update) err
 	if err := h.userManager.CloseList(ctx); err != nil {
 		return b.SendMessage(update.Message.From.ID, "случилась ошибка")
 	}
-	logger.Success(fmt.Sprintf("⚙️✅ [SUCCESS] Admin %s closed line", update.Message.From.UserName))
+	logger.Success(fmt.Sprintf("⚙️✅ Admin %s closed line", update.Message.From.UserName))
 	return b.SendMessage(update.Message.From.ID, "запись закрыта")
 }
 
@@ -182,7 +182,7 @@ func (h *AdminHandlers) enableLimitHandler(b *bot.Bot, update tgbotapi.Update) e
 	}
 	ctx := context.Background()
 	h.userManager.SetLimit(ctx, 3)
-	logger.Success(fmt.Sprintf("⚙️✅ [SUCCESS] Admin %s enabled limit (3 songs)", update.CallbackQuery.From.UserName))
+	logger.Success(fmt.Sprintf("⚙️✅ Admin %s enabled limit (3 songs)", update.CallbackQuery.From.UserName))
 	return b.SendMessage(update.CallbackQuery.From.ID, "лимит ON. теперь каждый поёт не больше трёх раз")
 }
 
@@ -192,7 +192,7 @@ func (h *AdminHandlers) disableLimitHandler(b *bot.Bot, update tgbotapi.Update) 
 	}
 	ctx := context.Background()
 	h.userManager.SetLimit(ctx, 1000)
-	logger.Success(fmt.Sprintf("⚙️✅ [SUCCESS] Admin %s disabled limit", update.CallbackQuery.From.UserName))
+	logger.Success(fmt.Sprintf("⚙️✅ Admin %s disabled limit", update.CallbackQuery.From.UserName))
 	return b.SendMessage(update.CallbackQuery.From.ID, "лимит OFF. все поют сколько угодно")
 }
 
@@ -245,13 +245,13 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 	payload := map[string]string{"name": "NEXT_PUBLIC_SHOW_PROMO", "value": value}
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to marshal GitHub variable payload\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to marshal GitHub variable payload\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке payload: %v", err))
 	}
 
 	req, err := http.NewRequest("PATCH", apiUrl, bytes.NewBuffer(jsonPayload))
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to create GitHub PATCH request\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to create GitHub PATCH request\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании запроса: %v", err))
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("token %s", githubToken))
@@ -269,7 +269,7 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 		resp, err = client.Do(req)
 	}
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to update GitHub variable NEXT_PUBLIC_SHOW_PROMO\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to update GitHub variable NEXT_PUBLIC_SHOW_PROMO\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, "ошибка при обновлении переменной в GitHub")
 	}
 	defer resp.Body.Close()
@@ -288,13 +288,13 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 	}
 	jsonRebuild, err := json.Marshal(rebuildPayload)
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to marshal rebuild payload\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to marshal rebuild payload\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке rebuild payload: %v", err))
 	}
 
 	req, err = http.NewRequest("POST", rebuildUrl, bytes.NewBuffer(jsonRebuild))
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to create rebuild request\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to create rebuild request\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании rebuild запроса: %v", err))
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
@@ -303,7 +303,7 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 
 	resp, err = client.Do(req)
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to trigger rebuild\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to trigger rebuild\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, "ошибка при запуске пересборки")
 	}
 	defer resp.Body.Close()
@@ -333,13 +333,13 @@ func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, 
 
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to marshal GitHub webhook payload\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to marshal GitHub webhook payload\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке payload: %v", err))
 	}
 
 	req, err := http.NewRequest("POST", githubWebhookURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to create GitHub webhook request\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to create GitHub webhook request\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании запроса: %v", err))
 	}
 
@@ -350,7 +350,7 @@ func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to send GitHub webhook request\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to send GitHub webhook request\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при запросе к github: %v", err))
 	}
 	defer resp.Body.Close()
@@ -398,7 +398,7 @@ func (h *AdminHandlers) fetchCurrentPromoValues() (string, string, error) {
 	textURL := fmt.Sprintf("https://api.github.com/repos/%s/actions/variables/NEXT_PUBLIC_PROMO_TEXT", repo)
 	text, err := h.fetchGitHubVariable(textURL, githubToken)
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to fetch NEXT_PUBLIC_PROMO_TEXT from GitHub\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to fetch NEXT_PUBLIC_PROMO_TEXT from GitHub\nError: %v", err))
 		text = defaultText
 	}
 
@@ -406,7 +406,7 @@ func (h *AdminHandlers) fetchCurrentPromoValues() (string, string, error) {
 	urlURL := fmt.Sprintf("https://api.github.com/repos/%s/actions/variables/NEXT_PUBLIC_PROMO_URL", repo)
 	promoURL, err := h.fetchGitHubVariable(urlURL, githubToken)
 	if err != nil {
-		logger.Error(fmt.Sprintf("⚙️🔴 [ERROR] Failed to fetch NEXT_PUBLIC_PROMO_URL from GitHub\nError: %v", err))
+		logger.Error(fmt.Sprintf("⚙️🔴 Failed to fetch NEXT_PUBLIC_PROMO_URL from GitHub\nError: %v", err))
 		promoURL = defaultURL
 	}
 

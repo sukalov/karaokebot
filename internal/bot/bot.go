@@ -54,7 +54,7 @@ func (b *Bot) Start(
 	if strings.Contains(b.name, "admin") {
 		botIndicator = "⚙️"
 	}
-	logger.Info(fmt.Sprintf("%s [INFO] [%s] authorized on account %s", botIndicator, b.name, b.Client.Self.UserName))
+	logger.Info(fmt.Sprintf("%s [%s] authorized on account %s", botIndicator, b.name, b.Client.Self.UserName))
 
 	for {
 		select {
@@ -81,7 +81,7 @@ func (b *Bot) processUpdate(
 	if update.Message != nil && update.Message.IsCommand() {
 		if handler, exists := commandHandlers[update.Message.Command()]; exists {
 			if err := handler(b, update); err != nil {
-				logger.Error(fmt.Sprintf("%s🔴 [ERROR] [%s] command handler error: %v", botIndicator, b.name, err))
+				logger.Error(fmt.Sprintf("%s🔴 [%s] command handler error: %v", botIndicator, b.name, err))
 			}
 			return
 		}
@@ -98,7 +98,7 @@ func (b *Bot) processUpdate(
 		}
 		if handler, exists := callbackHandlers[query]; exists {
 			if err := handler(b, update); err != nil {
-				logger.Error(fmt.Sprintf("%s🔴 [ERROR] [%s] callback handler error: %v", botIndicator, b.name, err))
+				logger.Error(fmt.Sprintf("%s🔴 [%s] callback handler error: %v", botIndicator, b.name, err))
 			}
 			return
 		} else {
@@ -112,7 +112,7 @@ func (b *Bot) processUpdate(
 			if errors.Is(err, ErrMessageHandled) {
 				break
 			}
-			logger.Error(fmt.Sprintf("%s🔴 [ERROR] [%s] message handler error: %v", botIndicator, b.name, err))
+			logger.Error(fmt.Sprintf("%s🔴 [%s] message handler error: %v", botIndicator, b.name, err))
 		}
 	}
 }
