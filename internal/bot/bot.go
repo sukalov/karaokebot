@@ -50,7 +50,7 @@ func (b *Bot) Start(
 	messageHandlers []func(b *Bot, update tgbotapi.Update) error,
 	callbackHandlers map[string]func(b *Bot, update tgbotapi.Update) error,
 ) {
-	logger.Info(strings.Contains(b.name, "admin"), fmt.Sprintf("%s authorized on account %s", b.name, b.Client.Self.UserName))
+	logger.Info(strings.Contains(b.name, "Admin"), fmt.Sprintf("%s authorized on account %s", b.name, b.Client.Self.UserName))
 
 	for {
 		select {
