@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/sukalov/karaokebot/internal/logger"
 	"github.com/sukalov/karaokebot/internal/lyrics/parsers/amdm"
 )
 
@@ -34,16 +35,20 @@ func main() {
 	parser := amdm.NewParser()
 	result, err := parser.ExtractLyricsFromAmdm(url)
 	if err != nil {
+		logger.Error(fmt.Sprintf("Error extracting lyrics\nURL: %s\nError: %v", url, err))
 		log.Fatalf("Error extracting lyrics: %v", err)
 	}
 
 	if !result.Success {
+		logger.Error(fmt.Sprintf("Failed to extract lyrics\nURL: %s\nReason: %s", url, result.Error))
 		log.Fatalf("Failed to extract lyrics: %s", result.Error)
 	}
 
 	if err := os.WriteFile(outputFile, []byte(result.Text), 0644); err != nil {
+		logger.Error(fmt.Sprintf("Error saving lyrics file\nFile: %s\nError: %v", outputFile, err))
 		log.Fatalf("Error saving file: %v", err)
 	}
+	logger.Success(fmt.Sprintf("Lyrics extraction completed successfully\nURL: %s\nOutput: %s\nLength: %d chars", url, outputFile, len(result.Text)))
 
 	fmt.Printf("Lyrics saved to: %s\n", outputFile)
 	fmt.Println("=== EXTRACTION COMPLETED SUCCESSFULLY ===")

@@ -32,7 +32,7 @@ func NewParser() *Parser {
 
 // ExtractLyricsFromAmdm extracts lyrics from an AmDm.ru page
 func (p *Parser) ExtractLyricsFromAmdm(url string) (*LyricsResult, error) {
-	fmt.Printf("Fetching page: %s\n", url)
+	logger.Info(fmt.Sprintf("Fetching AmDm page\nURL: %s", url))
 	logger.Debug(fmt.Sprintf("ExtractLyricsFromAmdm: Fetching page %s", url))
 
 	html, err := p.client.FetchPage(url)
@@ -69,7 +69,6 @@ func (p *Parser) ExtractLyricsFromAmdm(url string) (*LyricsResult, error) {
 		}, fmt.Errorf("target element not found")
 	}
 
-	fmt.Println("Found target element, extracting content...")
 	logger.Success(fmt.Sprintf("ExtractLyricsFromAmdm: Found target element for URL %s", url))
 
 	// Get original HTML content

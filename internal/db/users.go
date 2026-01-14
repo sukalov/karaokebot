@@ -4,11 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sukalov/karaokebot/internal/logger"
 )
 
 type User struct {
@@ -29,9 +29,7 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			log.Printf("error: timeout in 'Register' canceled after 5 seconds: %v",
-				ctx.Err(),
-			)
+			logger.Error(fmt.Sprintf("Query timeout in Register after 5 seconds\nChat ID: %d\nError: %v", update.Message.Chat.ID, ctx.Err()))
 		}
 	}()
 
@@ -55,11 +53,11 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 	defer func() {
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				log.Printf("error rolling back transaction: %v", rollbackErr)
+				logger.Error(fmt.Sprintf("Error rolling back transaction\nChat ID: %d\nError: %v", update.Message.Chat.ID, rollbackErr))
 			}
 		} else {
 			if commitErr := tx.Commit(); commitErr != nil {
-				log.Printf("error committing transaction: %v", commitErr)
+				logger.Error(fmt.Sprintf("Error committing transaction\nChat ID: %d\nError: %v", update.Message.Chat.ID, commitErr))
 			}
 		}
 	}()
@@ -95,10 +93,11 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 			return fmt.Errorf("failed to insert new user: %w", err)
 		}
 
-		log.Printf("new user registered: id: %d, username: %s",
+		logger.Info(fmt.Sprintf("New user registered\nChat ID: %d\nUsername: %s\nName: %s",
 			message.Chat.ID,
 			userName.String,
-		)
+			tgName.String,
+		))
 	}
 
 	return nil
@@ -111,10 +110,7 @@ func (u *UsersType) GetByChatID(chatID int64) (User, error) {
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			log.Printf("error: timeout in query '%s' canceled after 5 seconds: %v",
-				query,
-				ctx.Err(),
-			)
+			logger.Error(fmt.Sprintf("Query timeout after 5 seconds\nQuery: %s\nChat ID: %d", query, chatID))
 		}
 	}()
 
@@ -145,10 +141,7 @@ func (u *UsersType) UpdateSavedName(chatID int64, newName string) error {
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			log.Printf("error: timeout in query '%s' canceled after 5 seconds: %v",
-				query,
-				ctx.Err(),
-			)
+			logger.Error(fmt.Sprintf("Query timeout after 5 seconds\nQuery: %s\nChat ID: %d", query, chatID))
 		}
 	}()
 

@@ -4,11 +4,11 @@ package bot
 import (
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/sukalov/karaokebot/internal/logger"
 )
 
 // ErrMessageHandled indicates a message was handled and processing should stop
@@ -50,7 +50,7 @@ func (b *Bot) Start(
 	messageHandlers []func(b *Bot, update tgbotapi.Update) error,
 	callbackHandlers map[string]func(b *Bot, update tgbotapi.Update) error,
 ) {
-	log.Printf("[%s] authorized on account %s", b.name, b.Client.Self.UserName)
+	logger.Info(fmt.Sprintf("[%s] authorized on account %s", b.name, b.Client.Self.UserName))
 
 	for {
 		select {
@@ -70,13 +70,13 @@ func (b *Bot) processUpdate(
 	callbackHandlers map[string]func(b *Bot, update tgbotapi.Update) error,
 ) {
 	if update.CallbackQuery != nil {
-		fmt.Println(update.CallbackQuery.Data)
+		logger.Debug(fmt.Sprintf("Callback query received: %s", update.CallbackQuery.Data))
 	}
 	// Handle command updates
 	if update.Message != nil && update.Message.IsCommand() {
 		if handler, exists := commandHandlers[update.Message.Command()]; exists {
 			if err := handler(b, update); err != nil {
-				log.Printf("[%s] command handler error: %v", b.name, err)
+				logger.Error(fmt.Sprintf("[%s] command handler error: %v", b.name, err))
 			}
 			return
 		}
@@ -93,7 +93,7 @@ func (b *Bot) processUpdate(
 		}
 		if handler, exists := callbackHandlers[query]; exists {
 			if err := handler(b, update); err != nil {
-				log.Printf("[%s] callback handler error: %v", b.name, err)
+				logger.Error(fmt.Sprintf("[%s] callback handler error: %v", b.name, err))
 			}
 			return
 		} else {
@@ -105,9 +105,9 @@ func (b *Bot) processUpdate(
 	for _, handler := range messageHandlers {
 		if err := handler(b, update); err != nil {
 			if errors.Is(err, ErrMessageHandled) {
-				break // Stop processing if message was handled
+				break
 			}
-			log.Printf("[%s] message handler error: %v", b.name, err)
+			logger.Error(fmt.Sprintf("[%s] message handler error: %v", b.name, err))
 		}
 	}
 }

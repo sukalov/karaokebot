@@ -239,11 +239,13 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 	payload := map[string]string{"name": "NEXT_PUBLIC_SHOW_PROMO", "value": value}
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to marshal GitHub variable payload\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке payload: %v", err))
 	}
 
 	req, err := http.NewRequest("PATCH", apiUrl, bytes.NewBuffer(jsonPayload))
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to create GitHub PATCH request\nURL: %s\nError: %v", apiUrl, err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании запроса: %v", err))
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("token %s", githubToken))
@@ -261,6 +263,7 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 		resp, err = client.Do(req)
 	}
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to update GitHub variable NEXT_PUBLIC_SHOW_PROMO\nURL: %s\nError: %v", apiUrl, err))
 		return b.SendMessage(update.Message.Chat.ID, "ошибка при обновлении переменной в GitHub")
 	}
 	defer resp.Body.Close()
@@ -279,11 +282,13 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 	}
 	jsonRebuild, err := json.Marshal(rebuildPayload)
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to marshal rebuild payload\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке rebuild payload: %v", err))
 	}
 
 	req, err = http.NewRequest("POST", rebuildUrl, bytes.NewBuffer(jsonRebuild))
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to create rebuild request\nURL: %s\nError: %v", rebuildUrl, err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании rebuild запроса: %v", err))
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
@@ -292,6 +297,7 @@ func (h *AdminHandlers) updatePromoAndRebuild(b *bot.Bot, update tgbotapi.Update
 
 	resp, err = client.Do(req)
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to trigger rebuild\nURL: %s\nError: %v", rebuildUrl, err))
 		return b.SendMessage(update.Message.Chat.ID, "ошибка при запуске пересборки")
 	}
 	defer resp.Body.Close()
@@ -321,11 +327,13 @@ func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, 
 
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to marshal GitHub webhook payload\nError: %v", err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при подготовке payload: %v", err))
 	}
 
 	req, err := http.NewRequest("POST", githubWebhookURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to create GitHub webhook request\nURL: %s\nError: %v", githubWebhookURL, err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при создании запроса: %v", err))
 	}
 
@@ -336,6 +344,7 @@ func (h *AdminHandlers) triggerGithubAction(b *bot.Bot, update tgbotapi.Update, 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to send GitHub webhook request\nURL: %s\nError: %v", githubWebhookURL, err))
 		return b.SendMessage(update.Message.Chat.ID, fmt.Sprintf("ошибка при запросе к github: %v", err))
 	}
 	defer resp.Body.Close()
@@ -378,6 +387,7 @@ func (h *AdminHandlers) fetchCurrentPromoValues() (string, string, error) {
 	textURL := fmt.Sprintf("https://api.github.com/repos/%s/actions/variables/NEXT_PUBLIC_PROMO_TEXT", repo)
 	text, err := h.fetchGitHubVariable(textURL, githubToken)
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to fetch NEXT_PUBLIC_PROMO_TEXT from GitHub\nError: %v", err))
 		text = defaultText
 	}
 
@@ -385,6 +395,7 @@ func (h *AdminHandlers) fetchCurrentPromoValues() (string, string, error) {
 	urlURL := fmt.Sprintf("https://api.github.com/repos/%s/actions/variables/NEXT_PUBLIC_PROMO_URL", repo)
 	promoURL, err := h.fetchGitHubVariable(urlURL, githubToken)
 	if err != nil {
+		logger.Error(fmt.Sprintf("Failed to fetch NEXT_PUBLIC_PROMO_URL from GitHub\nError: %v", err))
 		promoURL = defaultURL
 	}
 

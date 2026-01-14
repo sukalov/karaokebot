@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -37,7 +36,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 	err := db.Users.Register(update)
 
 	if err != nil {
-		log.Printf("error registering user: %v", err)
+		logger.Error(fmt.Sprintf("Error registering user\nChat ID: %d\nUsername: %s\nError: %v", message.Chat.ID, message.From.UserName, err))
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при регистрации")
 	}
 
@@ -56,7 +55,7 @@ func (h *ClientHandlers) startHandler(b *bot.Bot, update tgbotapi.Update) error 
 		// Check if user exists in database
 		user, err := db.Users.GetByChatID(message.Chat.ID)
 		if err != nil {
-			log.Printf("error fetching user: %v", err)
+			logger.Error(fmt.Sprintf("Error fetching user\nChat ID: %d\nError: %v", message.Chat.ID, err))
 			return b.SendMessage(message.Chat.ID, "произошла ошибка при поиске пользователя")
 		}
 
@@ -155,7 +154,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	// Answer callback immediately
 	callback := tgbotapi.NewCallback(query.ID, "")
 	if _, err := b.Client.Request(callback); err != nil {
-		log.Printf("failed to answer callback query: %v", err)
+		logger.Error(fmt.Sprintf("Failed to answer callback query\nQuery ID: %s\nError: %v", query.ID, err))
 		return err
 	}
 
@@ -180,7 +179,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	if !h.userManager.IsOpen() {
 		ctx := context.Background()
 		if err := h.userManager.RemoveState(ctx, stateToUpdate.ID); err != nil {
-			fmt.Printf("error cleaning up user state: %s", err)
+			logger.Error(fmt.Sprintf("Error cleaning up user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
 			return b.SendMessage(message.Chat.ID, "УВЫ!")
 		}
 		return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта.\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
@@ -189,12 +188,12 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	// Use context with timeout for database operations
 	user, err := db.Users.GetByChatID(message.Chat.ID)
 	if err != nil {
-		log.Printf("error getting user by chat ID: %v", err)
+		logger.Error(fmt.Sprintf("Error getting user by chat ID\nChat ID: %d\nError: %v", message.Chat.ID, err))
 		return b.SendMessage(message.Chat.ID, "произошла ошибка при получении сохраненного имени")
 	}
 
 	if !user.SavedName.Valid {
-		log.Printf("user saved name not found")
+		logger.Error(fmt.Sprintf("User saved name not found\nChat ID: %d", message.Chat.ID))
 		return fmt.Errorf("user saved name not found")
 	}
 
@@ -203,11 +202,11 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	stateToUpdate.TimeAdded = time.Now()
 
 	if err := h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate); err != nil {
-		log.Printf("error editing state: %v", err)
+		logger.Error(fmt.Sprintf("Error editing user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
 	}
 
 	if err := h.userManager.Sync(ctx); err != nil {
-		log.Printf("error syncing state: %v", err)
+		logger.Error(fmt.Sprintf("Error syncing user state\nChat ID: %d\nError: %v", message.Chat.ID, err))
 	}
 
 	// Group these operations together since they're related
@@ -231,10 +230,10 @@ operations:
 		select {
 		case err := <-errChan:
 			if err != nil {
-				log.Printf("async operation error: %v", err)
+				logger.Error(fmt.Sprintf("Async operation error\nChat ID: %d\nError: %v", message.Chat.ID, err))
 			}
 		case <-ctx.Done():
-			log.Printf("timeout waiting for increment operations")
+			logger.Error(fmt.Sprintf("Timeout waiting for increment operations\nChat ID: %d", message.Chat.ID))
 			break operations
 		}
 	}
@@ -307,7 +306,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	if !h.userManager.IsOpen() {
 		ctx := context.Background()
 		if err := h.userManager.RemoveState(ctx, stateToUpdate.ID); err != nil {
-			fmt.Printf("error cleaning up user state: %s", err)
+			logger.Error(fmt.Sprintf("Error cleaning up user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
 			return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта. (простите, мы понимаем, вы были уже так близко)\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
 		}
 		return b.SendMessage(message.Chat.ID, "УВЫ! запись на караоке уже закрыта. (простите, мы понимаем, вы были уже так близко)\nподписываётесь на @povsemmestam чтобы не пропустить следующее")
@@ -323,13 +322,13 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate)
 	h.userManager.Sync(ctx)
 	if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
-		fmt.Printf("increment performances failed: %s", err)
+		logger.Error(fmt.Sprintf("Failed to increment times performed\nChat ID: %d\nError: %v", stateToUpdate.ChatID, err))
 	}
 	if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
-		fmt.Printf("increment counter failed: %s", err)
+		logger.Error(fmt.Sprintf("Failed to increment song counter\nSong ID: %s\nChat ID: %d\nError: %v", stateToUpdate.SongID, stateToUpdate.ChatID, err))
 	}
 	if err := db.Users.UpdateSavedName(stateToUpdate.ChatID, stateToUpdate.TypedName); err != nil {
-		fmt.Printf("increment counter failed: %s", err)
+		logger.Error(fmt.Sprintf("Failed to update saved name\nChat ID: %d\nName: %s\nError: %v", stateToUpdate.ChatID, stateToUpdate.TypedName, err))
 	}
 
 	// Fetch lyrics if it's an AmDm.ru URL
