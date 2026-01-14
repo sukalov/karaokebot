@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/sukalov/karaokebot/internal/utils"
-	"github.com/sukalov/karaokebot/internal/utils/e"
 )
 
 var (
@@ -62,24 +60,11 @@ func sendLog(prefix, message string) {
 		return
 	}
 
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	logMessage := fmt.Sprintf("[%s] %s\n%s", timestamp, prefix, message)
+	logMessage := fmt.Sprintf("%s\n%s", prefix, message)
 
 	go func() {
 		if err := botClient.SendMessage(ChannelID, logMessage); err != nil {
 			fmt.Printf("Failed to send log to channel: %v\nLog was: %s\n", err, logMessage)
 		}
 	}()
-}
-
-func LogWithErr(message string, err error) {
-	if err == nil {
-		Info(message)
-		return
-	}
-
-	msg := fmt.Sprintf("%s\nError: %v", message, err)
-	Error(msg)
-
-	e.Wrap(message, err)
 }

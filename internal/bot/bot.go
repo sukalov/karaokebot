@@ -50,7 +50,11 @@ func (b *Bot) Start(
 	messageHandlers []func(b *Bot, update tgbotapi.Update) error,
 	callbackHandlers map[string]func(b *Bot, update tgbotapi.Update) error,
 ) {
-	logger.Info(fmt.Sprintf("[%s] authorized on account %s", b.name, b.Client.Self.UserName))
+	botIndicator := "🎵"
+	if strings.Contains(b.name, "admin") {
+		botIndicator = "⚙️"
+	}
+	logger.Info(fmt.Sprintf("%s [INFO] [%s] authorized on account %s", botIndicator, b.name, b.Client.Self.UserName))
 
 	for {
 		select {
@@ -69,14 +73,15 @@ func (b *Bot) processUpdate(
 	messageHandlers []func(b *Bot, update tgbotapi.Update) error,
 	callbackHandlers map[string]func(b *Bot, update tgbotapi.Update) error,
 ) {
-	if update.CallbackQuery != nil {
-		logger.Debug(fmt.Sprintf("Callback query received: %s", update.CallbackQuery.Data))
+	botIndicator := "🎵"
+	if strings.Contains(b.name, "admin") {
+		botIndicator = "⚙️"
 	}
 	// Handle command updates
 	if update.Message != nil && update.Message.IsCommand() {
 		if handler, exists := commandHandlers[update.Message.Command()]; exists {
 			if err := handler(b, update); err != nil {
-				logger.Error(fmt.Sprintf("[%s] command handler error: %v", b.name, err))
+				logger.Error(fmt.Sprintf("%s🔴 [ERROR] [%s] command handler error: %v", botIndicator, b.name, err))
 			}
 			return
 		}
@@ -93,7 +98,7 @@ func (b *Bot) processUpdate(
 		}
 		if handler, exists := callbackHandlers[query]; exists {
 			if err := handler(b, update); err != nil {
-				logger.Error(fmt.Sprintf("[%s] callback handler error: %v", b.name, err))
+				logger.Error(fmt.Sprintf("%s🔴 [ERROR] [%s] callback handler error: %v", botIndicator, b.name, err))
 			}
 			return
 		} else {
@@ -107,7 +112,7 @@ func (b *Bot) processUpdate(
 			if errors.Is(err, ErrMessageHandled) {
 				break
 			}
-			logger.Error(fmt.Sprintf("[%s] message handler error: %v", b.name, err))
+			logger.Error(fmt.Sprintf("%s🔴 [ERROR] [%s] message handler error: %v", botIndicator, b.name, err))
 		}
 	}
 }

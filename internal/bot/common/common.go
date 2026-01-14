@@ -7,6 +7,7 @@ import (
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/sukalov/karaokebot/internal/bot"
+	"github.com/sukalov/karaokebot/internal/logger"
 	"github.com/sukalov/karaokebot/internal/state"
 	"github.com/sukalov/karaokebot/internal/utils"
 )
@@ -49,8 +50,11 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 	lineUsers := h.userManager.GetAllInLine()
 
 	if len(lineUsers) == 0 {
+		logger.Info(fmt.Sprintf("🎵📋 [INFO] /line command executed - queue is empty"))
 		return b.SendMessage(message.Chat.ID, "в очереди никого нет")
 	}
+
+	logger.Info(fmt.Sprintf("🎵📋 [INFO] /line command executed - %d users in queue", len(lineUsers)))
 
 	sort.Sort(state.ByTimeAdded(lineUsers))
 
@@ -85,8 +89,9 @@ func (h *CommonHandlers) lineHandler(b *bot.Bot, update tgbotapi.Update) error {
 }
 
 func (h *CommonHandlers) usersHandler(b *bot.Bot, update tgbotapi.Update) error {
-
 	userStates := h.userManager.GetAll()
+
+	logger.Info(fmt.Sprintf("🎵📋 [INFO] /users command executed - %d total user states", len(userStates)))
 
 	jsonData, err := json.MarshalIndent(userStates, "", "  ")
 	if err != nil {

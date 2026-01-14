@@ -63,7 +63,7 @@ func (sm *StateManager) AddUser(ctx context.Context, state users.UserState) erro
 	defer sm.mu.Unlock()
 	sm.list = append(sm.list, state)
 	if err := redis.SetList(ctx, sm.list); err != nil {
-		logger.Error(fmt.Sprintf("Error adding to redis list\nError: %v", err))
+		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error adding to redis list\nError: %v", err))
 		return err
 	}
 	return nil
@@ -74,7 +74,7 @@ func (sm *StateManager) OpenList(ctx context.Context) error {
 	defer sm.mu.Unlock()
 	sm.open = true
 	if err := redis.SetOpen(ctx, true); err != nil {
-		logger.Error(fmt.Sprintf("Error saving list state to redis\nError: %v", err))
+		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error saving list state to redis\nError: %v", err))
 		return err
 	}
 	return nil
@@ -85,7 +85,7 @@ func (sm *StateManager) CloseList(ctx context.Context) error {
 	defer sm.mu.Unlock()
 	sm.open = false
 	if err := redis.SetOpen(ctx, false); err != nil {
-		logger.Error(fmt.Sprintf("Error saving list state to redis\nError: %v", err))
+		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error saving list state to redis\nError: %v", err))
 		return err
 	}
 	return nil
@@ -126,7 +126,7 @@ func (sm *StateManager) Clear(ctx context.Context) error {
 	defer sm.mu.RUnlock()
 	sm.list = []users.UserState{}
 	if err := redis.SetList(ctx, sm.list); err != nil {
-		logger.Error(fmt.Sprintf("Error clearing redis list\nError: %v", err))
+		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error clearing redis list\nError: %v", err))
 	}
 	return nil
 }
@@ -139,7 +139,7 @@ func (sm *StateManager) EditState(ctx context.Context, stateID int, newState use
 		if state.ID == stateID {
 			sm.list[i] = newState
 			if err := redis.SetList(ctx, sm.list); err != nil {
-				logger.Error(fmt.Sprintf("Error updating redis list\nError: %v", err))
+				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error updating redis list\nError: %v", err))
 				return err
 			}
 			return nil
@@ -153,7 +153,7 @@ func (sm *StateManager) Sync(ctx context.Context) error {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	if err := redis.SetList(ctx, sm.list); err != nil {
-		logger.Error(fmt.Sprintf("Error updating redis list\nError: %v", err))
+		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error updating redis list\nError: %v", err))
 		return err
 	}
 	return nil
@@ -170,7 +170,7 @@ func (sm *StateManager) RemoveState(ctx context.Context, stateID int) error {
 	}
 	sm.list = result
 	if err := redis.SetList(ctx, result); err != nil {
-		logger.Error(fmt.Sprintf("Error updating redis list\nError: %v", err))
+		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error updating redis list\nError: %v", err))
 		return err
 	}
 	return nil
@@ -185,7 +185,7 @@ func (sm *StateManager) SetLimit(ctx context.Context, limit int) error {
 	defer sm.mu.Unlock()
 	sm.limit = limit
 	if err := redis.SetLimit(ctx, limit); err != nil {
-		logger.Error(fmt.Sprintf("Error updating redis limit\nError: %v", err))
+		logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error updating redis limit\nError: %v", err))
 		return err
 	}
 	return nil

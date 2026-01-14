@@ -29,7 +29,7 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			logger.Error(fmt.Sprintf("Query timeout in Register after 5 seconds\nChat ID: %d\nError: %v", update.Message.Chat.ID, ctx.Err()))
+			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Query timeout after 5 seconds\nChat ID: %d", update.Message.Chat.ID))
 		}
 	}()
 
@@ -53,11 +53,11 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 	defer func() {
 		if err != nil {
 			if rollbackErr := tx.Rollback(); rollbackErr != nil {
-				logger.Error(fmt.Sprintf("Error rolling back transaction\nChat ID: %d\nError: %v", update.Message.Chat.ID, rollbackErr))
+				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error rolling back transaction\nChat ID: %d\nError: %v", message.Chat.ID, rollbackErr))
 			}
 		} else {
 			if commitErr := tx.Commit(); commitErr != nil {
-				logger.Error(fmt.Sprintf("Error committing transaction\nChat ID: %d\nError: %v", update.Message.Chat.ID, commitErr))
+				logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Error committing transaction\nChat ID: %d\nError: %v", message.Chat.ID, commitErr))
 			}
 		}
 	}()
@@ -93,7 +93,7 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 			return fmt.Errorf("failed to insert new user: %w", err)
 		}
 
-		logger.Info(fmt.Sprintf("New user registered\nChat ID: %d\nUsername: %s\nName: %s",
+		logger.Info(fmt.Sprintf("🎵📋 [INFO] New user registered\nChat ID: %d\nUsername: %s\nName: %s",
 			message.Chat.ID,
 			userName.String,
 			tgName.String,
@@ -105,18 +105,18 @@ func (u *UsersType) Register(update tgbotapi.Update) error {
 
 func (u *UsersType) GetByChatID(chatID int64) (User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	query := `SELECT chat_id, username, tg_name, saved_name, added_at, times_performed
-			  FROM users WHERE chat_id = ?`
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			logger.Error(fmt.Sprintf("Query timeout after 5 seconds\nQuery: %s\nChat ID: %d", query, chatID))
+			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Query timeout after 5 seconds\nChat ID: %d", chatID))
 		}
 	}()
 
 	var user User
 
 	var timestampStr string
+	query := `SELECT chat_id, username, tg_name, saved_name, added_at, times_performed
+			  FROM users WHERE chat_id = ?`
 	err := Database.QueryRowContext(ctx, query, chatID).Scan(
 		&user.ChatID,
 		&user.Username,
@@ -137,14 +137,14 @@ func (u *UsersType) GetByChatID(chatID int64) (User, error) {
 
 func (u *UsersType) UpdateSavedName(chatID int64, newName string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	query := `UPDATE users SET saved_name = ? WHERE chat_id = ?`
 	defer func() {
 		cancel()
 		if ctx.Err() == context.DeadlineExceeded {
-			logger.Error(fmt.Sprintf("Query timeout after 5 seconds\nQuery: %s\nChat ID: %d", query, chatID))
+			logger.Error(fmt.Sprintf("🎵🔴 [ERROR] Query timeout after 5 seconds\nChat ID: %d", chatID))
 		}
 	}()
 
+	query := `UPDATE users SET saved_name = ? WHERE chat_id = ?`
 	result, err := Database.ExecContext(ctx, query, newName, chatID)
 	if err != nil {
 		return fmt.Errorf("failed to update saved name: %w", err)
