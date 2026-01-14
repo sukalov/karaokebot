@@ -74,7 +74,7 @@ func (h *SearchHandler) findSongHandler(b *bot.Bot, update tgbotapi.Update) erro
 
 	h.awaitingSearch[update.Message.Chat.ID] = true
 	h.mu.Unlock()
-	logger.Info(fmt.Sprintf("⚙️ Admin %s initiated song search", update.Message.From.UserName))
+	logger.Info(true, fmt.Sprintf("Admin %s initiated song search", update.Message.From.UserName))
 	return b.SendMessage(update.Message.Chat.ID, "здесь можно найти песню и отредактировать. напишите название песни или артиста")
 }
 
@@ -85,7 +85,7 @@ func (h *SearchHandler) handleEditSong(b *bot.Bot, chatID int64, songID string) 
 	}
 
 	h.editingSong[chatID] = songID
-	logger.Info(fmt.Sprintf("⚙️ Editing song: %s", songID))
+	logger.Info(true, fmt.Sprintf("Editing song: %s", songID))
 
 	var rows [][]tgbotapi.InlineKeyboardButton
 	fields := []struct {
@@ -216,7 +216,7 @@ func (h *SearchHandler) handleFieldUpdate(b *bot.Bot, chatID int64, songID strin
 		return b.SendMessage(chatID, "ошибка при сохранении изменений")
 	}
 
-	logger.Info(fmt.Sprintf("⚙️ Updated field '%s' for song: %s", field, songID))
+	logger.Info(true, fmt.Sprintf("Updated field '%s' for song: %s", field, songID))
 	return b.SendMessage(chatID,
 		fmt.Sprintf("поле успешно обновлено!\nтекущие данные песни:\n%s",
 			song.Stringify(false)))
@@ -379,7 +379,7 @@ func (h *SearchHandler) handleDeleteSong(b *bot.Bot, chatID int64, songID string
 		return err
 	}
 
-	logger.Info(fmt.Sprintf("⚙️ Deleted song: %s", songID))
+	logger.Info(true, fmt.Sprintf("Deleted song: %s", songID))
 	return b.SendMessage(chatID, "песня удалена")
 }
 
@@ -422,7 +422,7 @@ func (h *SearchHandler) newSongHandler(b *bot.Bot, update tgbotapi.Update) error
 	}
 
 	chatID := update.Message.Chat.ID
-	logger.Info(fmt.Sprintf("⚙️ Admin %s initiated adding new song", update.Message.From.UserName))
+	logger.Info(true, fmt.Sprintf("Admin %s initiated adding new song", update.Message.From.UserName))
 	if err := b.SendMessageWithMarkdown(chatID, "*скопируйте* следующее вообщение (отдним кликом по тексту) и вставьте в него данные новой песни ровно *внутрь квадрятных скобок*. не убирайте квадратные скобки, редактируйте только внтури них, звёздочкой помечены обязательные поля.\n\nп.с. в графе \"исполнитель\" пишется либо название группы либо фамилия исполнителя.", true); err != nil {
 		return err
 	}
@@ -613,6 +613,6 @@ func (h *SearchHandler) handleSelectCategory(b *bot.Bot, chatID int64, category 
 		return b.SendMessage(chatID, fmt.Sprintf("ошибка при добавлении песни: %v", err))
 	}
 	delete(h.addingSong, chatID)
-	logger.Info(fmt.Sprintf("⚙️ Added new song: %s (%s)", song.Title, song.ID))
+	logger.Info(true, fmt.Sprintf("Added new song: %s (%s)", song.Title, song.ID))
 	return b.SendMessage(chatID, fmt.Sprintf("песня добавлена \n\n%s\n\nне забудьте после всех изменений нажать /rebuild чтобы они появились на сайте", song.Stringify(false)))
 }

@@ -39,28 +39,33 @@ func Init(client BotClient) error {
 	return initErr
 }
 
-func Info(message string) {
-	sendLog("ℹ️ INFO", message)
+func Info(isAdmin bool, message string) {
+	sendLog(isAdmin, "ℹ️ INFO", message)
 }
 
-func Error(message string) {
-	sendLog("❌ ERROR", message)
+func Error(isAdmin bool, message string) {
+	sendLog(isAdmin, "❌ ERROR", message)
 }
 
-func Debug(message string) {
-	sendLog("🔍 DEBUG", message)
+func Debug(isAdmin bool, message string) {
+	sendLog(isAdmin, "🔍 DEBUG", message)
 }
 
-func Success(message string) {
-	sendLog("✅ SUCCESS", message)
+func Success(isAdmin bool, message string) {
+	sendLog(isAdmin, "✅ SUCCESS", message)
 }
 
-func sendLog(prefix, message string) {
+func sendLog(isAdmin bool, prefix, message string) {
 	if botClient == nil {
 		return
 	}
 
-	logMessage := fmt.Sprintf("%s %s", prefix, message)
+	botEmoji := "🎵"
+	if isAdmin {
+		botEmoji = "⚙️"
+	}
+
+	logMessage := fmt.Sprintf("%s %s %s", botEmoji, prefix, message)
 
 	go func() {
 		if err := botClient.SendMessage(ChannelID, logMessage); err != nil {
