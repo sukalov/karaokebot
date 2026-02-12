@@ -213,6 +213,19 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 
 	logger.Info(false, fmt.Sprintf("User %s (%d) added to line with song %s", user.SavedName.String, message.Chat.ID, stateToUpdate.SongName))
 
+	price := h.userManager.GetPrice()
+	if price > 0 {
+		return b.SendMessageWithButtons(
+			message.Chat.ID,
+			fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price),
+			tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("деньги улетели", fmt.Sprintf("payment_confirmed:%d", stateToUpdate.ID)),
+				),
+			),
+		)
+	}
+
 	// Fetch lyrics if it's an AmDm.ru URL
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
 		go func() {
@@ -290,6 +303,19 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 	logger.Info(false, fmt.Sprintf("User %s (%d) added to line with song %s", stateToUpdate.TypedName, message.Chat.ID, stateToUpdate.SongName))
 
+	price := h.userManager.GetPrice()
+	if price > 0 {
+		return b.SendMessageWithButtons(
+			message.Chat.ID,
+			fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price),
+			tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("деньги улетели", fmt.Sprintf("payment_confirmed:%d", stateToUpdate.ID)),
+				),
+			),
+		)
+	}
+
 	// Fetch lyrics if it's an AmDm.ru URL
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
 		go func() {
@@ -327,6 +353,70 @@ func randomMessageHandler(b *bot.Bot, update tgbotapi.Update) error {
 	)
 }
 
+func (h *ClientHandlers) paymentConfirmedHandler(b *bot.Bot, update tgbotapi.Update) error {
+	query := update.CallbackQuery
+
+	callback := tgbotapi.NewCallback(query.ID, "")
+	if _, err := b.Client.Request(callback); err != nil {
+		logger.Error(false, fmt.Sprintf(" Failed to answer callback query\nQuery ID: %s\nError: %v", query.ID, err))
+		return err
+	}
+
+	data := query.Data
+	parts := strings.SplitN(data, ":", 2)
+	if len(parts) < 2 {
+		return b.SendMessage(query.Message.Chat.ID, "неверный формат данных")
+	}
+
+	var stateID int
+	_, err := fmt.Sscanf(parts[1], "%d", &stateID)
+	if err != nil {
+		return b.SendMessage(query.Message.Chat.ID, "ошибка при обработке запроса")
+	}
+
+	userStates := h.userManager.GetAll()
+	var confirmedState *users.UserState
+	for i, state := range userStates {
+		if state.ID == stateID {
+			confirmedState = &userStates[i]
+			break
+		}
+	}
+
+	if confirmedState == nil {
+		return b.SendMessage(query.Message.Chat.ID, "запись не найдена")
+	}
+
+	if err := b.SendMessageWithMarkdown(
+		query.Message.Chat.ID,
+		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
+			confirmedState.TypedName, confirmedState.SongName, confirmedState.SongLink),
+		false,
+	); err != nil {
+		return err
+	}
+
+	if strings.Contains(confirmedState.SongLink, "amdm.ru") {
+		go func() {
+			lyricsResult, err := h.lyricsService.ExtractLyrics(confirmedState.SongLink)
+			if err != nil {
+				logger.Error(false, fmt.Sprintf(" Failed to fetch lyrics for song %s (%s)\nURL: %s\nUser: %s (%d)\nError: %v",
+					confirmedState.SongID, confirmedState.SongName, confirmedState.SongLink, confirmedState.TypedName, query.Message.Chat.ID, err))
+				return
+			}
+
+			if lyricsResult.Text != "" {
+				if err := b.SendMessageWithMarkdown(query.Message.Chat.ID, lyricsResult.Text, false); err != nil {
+					logger.Error(false, fmt.Sprintf(" Failed to send lyrics to user %d for song %s\nError: %v",
+						query.Message.Chat.ID, confirmedState.SongID, err))
+				}
+			}
+		}()
+	}
+
+	return nil
+}
+
 func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 	handlers := NewClientHandlers(userManager)
 	messageHandlers := []func(b *bot.Bot, update tgbotapi.Update) error{
@@ -352,6 +442,7 @@ func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 
 	callbackHandlers := common.GetCallbackHandlers(userManager)
 	callbackHandlers["use_saved_name"] = handlers.useSavedNameHandler
+	callbackHandlers["payment_confirmed"] = handlers.paymentConfirmedHandler
 
 	go clientBot.Start(
 		commandHandlers,

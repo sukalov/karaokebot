@@ -78,3 +78,26 @@ func SetLimit(ctx context.Context, limit int) error {
 	}
 	return Client.Set(ctx, "limit", limitJSON, 0).Err()
 }
+
+func GetPrice(ctx context.Context) (int, error) {
+	data, err := Client.Get(ctx, "price").Bytes()
+	if err != nil {
+		if err == redisClient.Nil {
+			return 0, nil
+		}
+		return 0, err
+	}
+	var price int
+	if err := json.Unmarshal(data, &price); err != nil {
+		return 0, err
+	}
+	return price, nil
+}
+
+func SetPrice(ctx context.Context, price int) error {
+	priceJSON, err := json.Marshal(price)
+	if err != nil {
+		return err
+	}
+	return Client.Set(ctx, "price", priceJSON, 0).Err()
+}

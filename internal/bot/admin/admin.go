@@ -196,6 +196,43 @@ func (h *AdminHandlers) disableLimitHandler(b *bot.Bot, update tgbotapi.Update) 
 	return b.SendMessage(update.CallbackQuery.From.ID, "лимит OFF. все поют сколько угодно")
 }
 
+func (h *AdminHandlers) changePriceHandler(b *bot.Bot, update tgbotapi.Update) error {
+	if !h.admins[update.Message.From.UserName] {
+		return b.SendMessage(update.Message.Chat.ID, "вы не админ")
+	}
+
+	message := update.Message
+	text := message.Text
+
+	args := strings.TrimPrefix(text, "/change_price ")
+	if args == text {
+		return b.SendMessage(message.Chat.ID, "использование: /change_price <число>")
+	}
+
+	var price int
+	_, err := fmt.Sscanf(strings.TrimSpace(args), "%d", &price)
+	if err != nil {
+		return b.SendMessage(message.Chat.ID, "неверный формат числа")
+	}
+
+	if price < 0 {
+		return b.SendMessage(message.Chat.ID, "цена не может быть отрицательной")
+	}
+
+	ctx := context.Background()
+	if err := h.userManager.SetPrice(ctx, price); err != nil {
+		return b.SendMessage(message.Chat.ID, "случилась ошибка при сохранении цены")
+	}
+
+	if price == 0 {
+		logger.Info(true, fmt.Sprintf("Admin %s set price to 0 (free)", message.From.UserName))
+		return b.SendMessage(message.Chat.ID, "караоке теперь бесплатное")
+	}
+
+	logger.Info(true, fmt.Sprintf("Admin %s set price to %d rubles", message.From.UserName, price))
+	return b.SendMessage(message.Chat.ID, fmt.Sprintf("установлена цена %d рублей за песню", price))
+}
+
 func (h *AdminHandlers) ShowPromoHandler(b *bot.Bot, update tgbotapi.Update) error {
 	return h.updatePromoAndRebuild(b, update, "true")
 }
@@ -724,6 +761,7 @@ func SetupHandlers(adminBot *bot.Bot, userManager *state.StateManager, adminUser
 	commandHandlers["newsong"] = searchHandlers.newSongHandler
 	commandHandlers["newsongform"] = searchHandlers.newSongFormHandler
 	commandHandlers["limit"] = handlers.limitHandler
+	commandHandlers["change_price"] = handlers.changePriceHandler
 	commandHandlers["test_lyrics"] = handlers.testLyricsHandler
 
 	// Add message handler

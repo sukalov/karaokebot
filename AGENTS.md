@@ -2,9 +2,16 @@
 
 This guide helps agentic coding agents work effectively in the karaokebot repository.
 
-## Build, Lint, and Test Commands
+## Universal Rules
 
-### Build Commands
+- do not write comments (unless specifically requested or for highly complex logic, in which case use sparingly and focus on 'why' not 'what').
+- do not use type assertions, unless it is totally impossible to do in other way.
+- never use explicit type "any".
+- use only bun as a default javascript runtime and package manager (NOTE: This project is primarily Go. This rule applies if/when JS components are introduced).
+
+## Commands: Build, Lint, and Test
+
+### Build
 - `make build` - Build the binary (CGO_ENABLED=0 GOOS=linux)
 - `make dev` - Run with Air hot reload during development
 - `make deps` - Download Go dependencies
@@ -56,48 +63,55 @@ This guide helps agentic coding agents work effectively in the karaokebot reposi
 - Constants: UPPER_SNAKE_CASE (e.g., `StageAskingName`)
 - Handler names end with "Handler" (e.g., `lineHandler`)
 
-### Error Handling
+## Error Handling
+
 - Always return errors, don't panic unless unrecoverable
 - Use `fmt.Errorf("%s: %w", msg, err)` for error wrapping
 - Use `e.Wrap(msg, err)` from `internal/utils/e` for consistent wrapping
 - Log errors with `logger.Error(fmt.Sprintf("context: %v", err))`
 - In handlers, return error to be handled by caller
 
-### Logging
+## Logging
+
 - Use `logger.Info(isAdmin, message)` for informational messages
 - Use `logger.Error(isAdmin, message)` for errors
 - Use `logger.Debug(isAdmin, message)` for debugging information
 - Use `logger.Success(isAdmin, message)` for successful operations
 - First parameter: `true` for admin logs, `false` for client logs
-- All emojis are handled by logger - DO NOT include emojis in log messages
+- All emojis are handled by logger - do not include emojis in log messages
 - Log format: `🎵 ℹ️ INFO Message` or `⚙️ ❌ ERROR Message`
 
-### Handlers
+## Handlers
+
 - Handler signature: `func(b *bot.Bot, update tgbotapi.Update) error`
 - Use `update.Message.Command()` for command handling
 - Use `update.CallbackQuery.Data` for inline button callbacks
 - Return `bot.ErrMessageHandled` to stop message processing
 - Return nil after successful handling
 
-### Database and Redis
+## Database and Redis
+
 - Package-level init functions for initialization
 - Use singleton pattern with `sync.Once`
 - Context parameter required for Redis operations: `ctx context.Context`
 - Pass context.Background() when no specific context needed
 - Connection settings: 25 max open/idle connections, 5 min lifetime
 
-### Concurrency
+## Concurrency
+
 - Use `sync.RWMutex` for state management in StateManager
 - Lock before modifying shared state: `defer mu.Unlock()`
 - Use read locks for reads: `mu.RLock()` / `defer mu.RUnlock()`
 - Use goroutines for non-blocking operations (e.g., logging)
 
-### Environment Variables
+## Environment Variables
+
 - Use `utils.LoadEnv([]string{"VAR_NAME"})` to load required env vars
 - Required vars: BOT_TOKEN, ADMIN_BOT_TOKEN, REDIS_URL, REDIS_PASSWORD, TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, LOG_CHANNEL_ID
 - Never commit .env file (in .gitignore)
 
-### Project Structure
+## Project Structure
+
 - `cmd/` - Application entry points
 - `internal/bot/` - Bot core (admin, client, common)
 - `internal/state/` - State management with Redis sync
@@ -108,7 +122,8 @@ This guide helps agentic coding agents work effectively in the karaokebot reposi
 - `internal/users/` - User state types
 - `internal/utils/` - Utilities (env loading, errors)
 
-### Best Practices
+## Best Practices
+
 - Use context for Redis operations
 - Validate user input in handlers before processing
 - Use `strings.TrimSpace()` to clean user input

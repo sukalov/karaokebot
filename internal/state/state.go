@@ -15,6 +15,7 @@ type StateManager struct {
 	list  []users.UserState
 	open  bool
 	limit int
+	price int
 }
 
 type ByTimeAdded []users.UserState
@@ -28,6 +29,7 @@ func NewStateManager() *StateManager {
 		list:  []users.UserState{},
 		open:  false,
 		limit: 3,
+		price: 0,
 	}
 }
 
@@ -39,6 +41,7 @@ func (sm *StateManager) Init() error {
 	list, err := redis.GetList(ctx)
 	open, err2 := redis.GetOpen(ctx)
 	limit, err3 := redis.GetLimit(ctx)
+	price, err4 := redis.GetPrice(ctx)
 	if err != nil {
 		return err
 	}
@@ -48,9 +51,13 @@ func (sm *StateManager) Init() error {
 	if err3 != nil {
 		return err3
 	}
+	if err4 != nil {
+		return err4
+	}
 	sm.list = list
 	sm.open = open
 	sm.limit = limit
+	sm.price = price
 	return nil
 }
 
@@ -186,6 +193,23 @@ func (sm *StateManager) SetLimit(ctx context.Context, limit int) error {
 	sm.limit = limit
 	if err := redis.SetLimit(ctx, limit); err != nil {
 		logger.Error(false, fmt.Sprintf(" Error updating redis limit\nError: %v", err))
+		return err
+	}
+	return nil
+}
+
+func (sm *StateManager) GetPrice() int {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	return sm.price
+}
+
+func (sm *StateManager) SetPrice(ctx context.Context, price int) error {
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	sm.price = price
+	if err := redis.SetPrice(ctx, price); err != nil {
+		logger.Error(false, fmt.Sprintf(" Error updating redis price\nError: %v", err))
 		return err
 	}
 	return nil
