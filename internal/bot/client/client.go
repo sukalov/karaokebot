@@ -200,6 +200,30 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	}
 
 	stateToUpdate.TypedName = user.SavedName.String
+
+	price := h.userManager.GetPrice()
+	if price > 0 {
+		// When price > 0, keep user in asking_name stage until payment confirmed
+		if err := h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate); err != nil {
+			logger.Error(false, fmt.Sprintf("Error editing user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
+		}
+
+		if err := h.userManager.Sync(ctx); err != nil {
+			logger.Error(false, fmt.Sprintf("Error syncing user state\nChat ID: %d\nError: %v", message.Chat.ID, err))
+		}
+
+		return b.SendMessageWithButtons(
+			message.Chat.ID,
+			fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price),
+			tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("деньги улетели", fmt.Sprintf("payment_confirmed:%d", stateToUpdate.ID)),
+				),
+			),
+		)
+	}
+
+	// No price - add user to line immediately
 	stateToUpdate.Stage = users.StageInLine
 	stateToUpdate.TimeAdded = time.Now()
 
@@ -212,19 +236,6 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	}
 
 	logger.Info(false, fmt.Sprintf("User %s (%d) added to line with song %s", user.SavedName.String, message.Chat.ID, stateToUpdate.SongName))
-
-	price := h.userManager.GetPrice()
-	if price > 0 {
-		return b.SendMessageWithButtons(
-			message.Chat.ID,
-			fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price),
-			tgbotapi.NewInlineKeyboardMarkup(
-				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("деньги улетели", fmt.Sprintf("payment_confirmed:%d", stateToUpdate.ID)),
-				),
-			),
-		)
-	}
 
 	// Fetch lyrics if it's an AmDm.ru URL
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
@@ -284,10 +295,29 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 	// Update the found state
 	stateToUpdate.TypedName = strings.ReplaceAll(message.Text, "_", "\\_")
+
+	price := h.userManager.GetPrice()
+	if price > 0 {
+		// When price > 0, keep user in asking_name stage until payment confirmed
+		ctx := context.Background()
+		h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate)
+		h.userManager.Sync(ctx)
+
+		return b.SendMessageWithButtons(
+			message.Chat.ID,
+			fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price),
+			tgbotapi.NewInlineKeyboardMarkup(
+				tgbotapi.NewInlineKeyboardRow(
+					tgbotapi.NewInlineKeyboardButtonData("деньги улетели", fmt.Sprintf("payment_confirmed:%d", stateToUpdate.ID)),
+				),
+			),
+		)
+	}
+
+	// No price - add user to line immediately
 	stateToUpdate.Stage = users.StageInLine
 	stateToUpdate.TimeAdded = time.Now()
 
-	// Edit the state in the user manager
 	ctx := context.Background()
 	h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate)
 	h.userManager.Sync(ctx)
@@ -302,19 +332,6 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	}
 
 	logger.Info(false, fmt.Sprintf("User %s (%d) added to line with song %s", stateToUpdate.TypedName, message.Chat.ID, stateToUpdate.SongName))
-
-	price := h.userManager.GetPrice()
-	if price > 0 {
-		return b.SendMessageWithButtons(
-			message.Chat.ID,
-			fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price),
-			tgbotapi.NewInlineKeyboardMarkup(
-				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("деньги улетели", fmt.Sprintf("payment_confirmed:%d", stateToUpdate.ID)),
-				),
-			),
-		)
-	}
 
 	// Fetch lyrics if it's an AmDm.ru URL
 	if strings.Contains(stateToUpdate.SongLink, "amdm.ru") {
@@ -386,6 +403,33 @@ func (h *ClientHandlers) paymentConfirmedHandler(b *bot.Bot, update tgbotapi.Upd
 	if confirmedState == nil {
 		return b.SendMessage(query.Message.Chat.ID, "запись не найдена")
 	}
+
+	// Add user to line after payment confirmation
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	confirmedState.Stage = users.StageInLine
+	confirmedState.TimeAdded = time.Now()
+
+	if err := h.userManager.EditState(ctx, confirmedState.ID, *confirmedState); err != nil {
+		logger.Error(false, fmt.Sprintf("Error editing user state after payment\nState ID: %d\nChat ID: %d\nError: %v", confirmedState.ID, query.Message.Chat.ID, err))
+	}
+
+	if err := h.userManager.Sync(ctx); err != nil {
+		logger.Error(false, fmt.Sprintf("Error syncing user state after payment\nChat ID: %d\nError: %v", query.Message.Chat.ID, err))
+	}
+
+	if err := db.Users.IncrementTimesPerformed(confirmedState.ChatID); err != nil {
+		logger.Error(false, fmt.Sprintf(" Failed to increment times performed\nChat ID: %d\nError: %v", confirmedState.ChatID, err))
+	}
+	if err := db.Songbook.IncrementSongCounter(confirmedState.SongID); err != nil {
+		logger.Error(false, fmt.Sprintf(" Failed to increment song counter\nSong ID: %s\nChat ID: %d\nError: %v", confirmedState.SongID, query.Message.Chat.ID, err))
+	}
+	if err := db.Users.UpdateSavedName(confirmedState.ChatID, confirmedState.TypedName); err != nil {
+		logger.Error(false, fmt.Sprintf(" Failed to update saved name\nChat ID: %d\nName: %s\nError: %v", confirmedState.ChatID, confirmedState.TypedName, err))
+	}
+
+	logger.Info(false, fmt.Sprintf("User %s (%d) added to line with song %s after payment confirmation", confirmedState.TypedName, query.Message.Chat.ID, confirmedState.SongName))
 
 	if err := b.SendMessageWithMarkdown(
 		query.Message.Chat.ID,

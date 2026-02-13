@@ -21,6 +21,7 @@ type UserState struct {
 }
 
 const (
-	StageAskingName = "asking_name"
-	StageInLine     = "in_line"
+	StageAskingName      = "asking_name"
+	StageAwaitingPayment = "awaiting_payment"
+	StageInLine          = "in_line"
 )
