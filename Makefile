@@ -47,3 +47,17 @@ deploy: build docker-build docker-push docker-clean
         --env-file /root/karaoke/.env \
         -d sukalov/karaokebot:latest \
 	"
+
+# Deployment without rebuilding the image
+.PHONY: deploy-no-rebuild
+deploy-no-rebuild: docker-push docker-clean
+	ssh root@176.124.208.218 "\
+		cd /root && \
+		docker stop karaoke || true; \
+		docker rm karaoke || true; \
+		docker pull sukalov/karaokebot:latest && \
+		docker run --name karaoke \
+		--restart always \
+        --env-file /root/karaoke/.env \
+        -d sukalov/karaokebot:latest; \
+	"

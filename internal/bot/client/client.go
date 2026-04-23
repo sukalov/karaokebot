@@ -16,6 +16,19 @@ import (
 	"github.com/sukalov/karaokebot/internal/users"
 )
 
+func paymentInfoLine(price int) string {
+	return fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price)
+}
+
+func lineJoinedMessage(typedName, songName, songLink string, price int) string {
+	if price > 0 {
+		return fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\n%s\n\nа слова можно найти [здесь](%s)",
+			typedName, songName, paymentInfoLine(price), songLink)
+	}
+	return fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
+		typedName, songName, songLink)
+}
+
 type ClientHandlers struct {
 	userManager   *state.StateManager
 	lyricsService *lyrics.Service
@@ -202,28 +215,6 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 	stateToUpdate.TypedName = user.SavedName.String
 
 	price := h.userManager.GetPrice()
-	if price > 0 {
-		// When price > 0, keep user in asking_name stage until payment confirmed
-		if err := h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate); err != nil {
-			logger.Error(false, fmt.Sprintf("Error editing user state\nState ID: %d\nChat ID: %d\nError: %v", stateToUpdate.ID, message.Chat.ID, err))
-		}
-
-		if err := h.userManager.Sync(ctx); err != nil {
-			logger.Error(false, fmt.Sprintf("Error syncing user state\nChat ID: %d\nError: %v", message.Chat.ID, err))
-		}
-
-		return b.SendMessageWithButtons(
-			message.Chat.ID,
-			fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price),
-			tgbotapi.NewInlineKeyboardMarkup(
-				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("деньги улетели", fmt.Sprintf("payment_confirmed:%d", stateToUpdate.ID)),
-				),
-			),
-		)
-	}
-
-	// No price - add user to line immediately
 	stateToUpdate.Stage = users.StageInLine
 	stateToUpdate.TimeAdded = time.Now()
 
@@ -233,6 +224,18 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 
 	if err := h.userManager.Sync(ctx); err != nil {
 		logger.Error(false, fmt.Sprintf("Error syncing user state\nChat ID: %d\nError: %v", message.Chat.ID, err))
+	}
+
+	if price > 0 {
+		if err := db.Users.IncrementTimesPerformed(stateToUpdate.ChatID); err != nil {
+			logger.Error(false, fmt.Sprintf(" Failed to increment times performed\nChat ID: %d\nError: %v", stateToUpdate.ChatID, err))
+		}
+		if err := db.Songbook.IncrementSongCounter(stateToUpdate.SongID); err != nil {
+			logger.Error(false, fmt.Sprintf(" Failed to increment song counter\nSong ID: %s\nChat ID: %d\nError: %v", stateToUpdate.SongID, stateToUpdate.ChatID, err))
+		}
+		if err := db.Users.UpdateSavedName(stateToUpdate.ChatID, stateToUpdate.TypedName); err != nil {
+			logger.Error(false, fmt.Sprintf(" Failed to update saved name\nChat ID: %d\nName: %s\nError: %v", stateToUpdate.ChatID, stateToUpdate.TypedName, err))
+		}
 	}
 
 	logger.Info(false, fmt.Sprintf("User %s (%d) added to line with song %s", user.SavedName.String, message.Chat.ID, stateToUpdate.SongName))
@@ -261,8 +264,7 @@ func (h *ClientHandlers) useSavedNameHandler(b *bot.Bot, update tgbotapi.Update)
 
 	return b.SendMessageWithMarkdown(
 		message.Chat.ID,
-		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
-			user.SavedName.String, stateToUpdate.SongName, stateToUpdate.SongLink),
+		lineJoinedMessage(user.SavedName.String, stateToUpdate.SongName, stateToUpdate.SongLink, price),
 		false,
 	)
 }
@@ -297,24 +299,6 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 	stateToUpdate.TypedName = strings.ReplaceAll(message.Text, "_", "\\_")
 
 	price := h.userManager.GetPrice()
-	if price > 0 {
-		// When price > 0, keep user in asking_name stage until payment confirmed
-		ctx := context.Background()
-		h.userManager.EditState(ctx, stateToUpdate.ID, *stateToUpdate)
-		h.userManager.Sync(ctx)
-
-		return b.SendMessageWithButtons(
-			message.Chat.ID,
-			fmt.Sprintf("сегодня караоке платное. спеть песню — %d рублей. можно перевести на тиньков сюда: https://www.tinkoff.ru/cf/9eX5F6qEily или по сбп на тиньков сюда: +7-916-06-506-11 матвей. не забудьте скриншот сделать", price),
-			tgbotapi.NewInlineKeyboardMarkup(
-				tgbotapi.NewInlineKeyboardRow(
-					tgbotapi.NewInlineKeyboardButtonData("деньги улетели", fmt.Sprintf("payment_confirmed:%d", stateToUpdate.ID)),
-				),
-			),
-		)
-	}
-
-	// No price - add user to line immediately
 	stateToUpdate.Stage = users.StageInLine
 	stateToUpdate.TimeAdded = time.Now()
 
@@ -357,8 +341,7 @@ func (h *ClientHandlers) nameHandler(b *bot.Bot, update tgbotapi.Update) error {
 
 	return b.SendMessageWithMarkdown(
 		message.Chat.ID,
-		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
-			stateToUpdate.TypedName, stateToUpdate.SongName, stateToUpdate.SongLink),
+		lineJoinedMessage(stateToUpdate.TypedName, stateToUpdate.SongName, stateToUpdate.SongLink, price),
 		false,
 	)
 }
@@ -368,97 +351,6 @@ func randomMessageHandler(b *bot.Bot, update tgbotapi.Update) error {
 		update.Message.Chat.ID,
 		"этого я не понимаю...\n\nвыбор песен в сонгбуке: https://karaoke.sukalov.dev",
 	)
-}
-
-func (h *ClientHandlers) paymentConfirmedHandler(b *bot.Bot, update tgbotapi.Update) error {
-	query := update.CallbackQuery
-
-	callback := tgbotapi.NewCallback(query.ID, "")
-	if _, err := b.Client.Request(callback); err != nil {
-		logger.Error(false, fmt.Sprintf(" Failed to answer callback query\nQuery ID: %s\nError: %v", query.ID, err))
-		return err
-	}
-
-	data := query.Data
-	parts := strings.SplitN(data, ":", 2)
-	if len(parts) < 2 {
-		return b.SendMessage(query.Message.Chat.ID, "неверный формат данных")
-	}
-
-	var stateID int
-	_, err := fmt.Sscanf(parts[1], "%d", &stateID)
-	if err != nil {
-		return b.SendMessage(query.Message.Chat.ID, "ошибка при обработке запроса")
-	}
-
-	userStates := h.userManager.GetAll()
-	var confirmedState *users.UserState
-	for i, state := range userStates {
-		if state.ID == stateID {
-			confirmedState = &userStates[i]
-			break
-		}
-	}
-
-	if confirmedState == nil {
-		return b.SendMessage(query.Message.Chat.ID, "запись не найдена")
-	}
-
-	// Add user to line after payment confirmation
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	confirmedState.Stage = users.StageInLine
-	confirmedState.TimeAdded = time.Now()
-
-	if err := h.userManager.EditState(ctx, confirmedState.ID, *confirmedState); err != nil {
-		logger.Error(false, fmt.Sprintf("Error editing user state after payment\nState ID: %d\nChat ID: %d\nError: %v", confirmedState.ID, query.Message.Chat.ID, err))
-	}
-
-	if err := h.userManager.Sync(ctx); err != nil {
-		logger.Error(false, fmt.Sprintf("Error syncing user state after payment\nChat ID: %d\nError: %v", query.Message.Chat.ID, err))
-	}
-
-	if err := db.Users.IncrementTimesPerformed(confirmedState.ChatID); err != nil {
-		logger.Error(false, fmt.Sprintf(" Failed to increment times performed\nChat ID: %d\nError: %v", confirmedState.ChatID, err))
-	}
-	if err := db.Songbook.IncrementSongCounter(confirmedState.SongID); err != nil {
-		logger.Error(false, fmt.Sprintf(" Failed to increment song counter\nSong ID: %s\nChat ID: %d\nError: %v", confirmedState.SongID, query.Message.Chat.ID, err))
-	}
-	if err := db.Users.UpdateSavedName(confirmedState.ChatID, confirmedState.TypedName); err != nil {
-		logger.Error(false, fmt.Sprintf(" Failed to update saved name\nChat ID: %d\nName: %s\nError: %v", confirmedState.ChatID, confirmedState.TypedName, err))
-	}
-
-	logger.Info(false, fmt.Sprintf("User %s (%d) added to line with song %s after payment confirmation", confirmedState.TypedName, query.Message.Chat.ID, confirmedState.SongName))
-
-	if err := b.SendMessageWithMarkdown(
-		query.Message.Chat.ID,
-		fmt.Sprintf("отлично, %s! вы выбрали песню \"%s\". скоро вас позовут на сцену\n\nа слова можно найти [здесь](%s)",
-			confirmedState.TypedName, confirmedState.SongName, confirmedState.SongLink),
-		false,
-	); err != nil {
-		return err
-	}
-
-	if strings.Contains(confirmedState.SongLink, "amdm.ru") {
-		go func() {
-			lyricsResult, err := h.lyricsService.ExtractLyrics(confirmedState.SongLink)
-			if err != nil {
-				logger.Error(false, fmt.Sprintf(" Failed to fetch lyrics for song %s (%s)\nURL: %s\nUser: %s (%d)\nError: %v",
-					confirmedState.SongID, confirmedState.SongName, confirmedState.SongLink, confirmedState.TypedName, query.Message.Chat.ID, err))
-				return
-			}
-
-			if lyricsResult.Text != "" {
-				if err := b.SendMessageWithMarkdown(query.Message.Chat.ID, lyricsResult.Text, false); err != nil {
-					logger.Error(false, fmt.Sprintf(" Failed to send lyrics to user %d for song %s\nError: %v",
-						query.Message.Chat.ID, confirmedState.SongID, err))
-				}
-			}
-		}()
-	}
-
-	return nil
 }
 
 func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
@@ -486,7 +378,6 @@ func SetupHandlers(clientBot *bot.Bot, userManager *state.StateManager) {
 
 	callbackHandlers := common.GetCallbackHandlers(userManager)
 	callbackHandlers["use_saved_name"] = handlers.useSavedNameHandler
-	callbackHandlers["payment_confirmed"] = handlers.paymentConfirmedHandler
 
 	go clientBot.Start(
 		commandHandlers,
